@@ -1,4 +1,4 @@
-/* GoalMatrix Pro - Football Predictions App Styles */
+/* GoalMatrix Pro - Football Predictions App Styles (v4.0 Full Suite) */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 :root {
@@ -62,8 +62,8 @@ body {
     box-shadow: 0 0 20px -4px rgba(6, 182, 212, 0.4);
 }
 
-.glow-rose {
-    box-shadow: 0 0 20px -4px rgba(244, 63, 94, 0.4);
+.glow-purple {
+    box-shadow: 0 0 20px -4px rgba(168, 85, 247, 0.45);
 }
 
 /* Custom Scrollbar */
@@ -85,13 +85,8 @@ body {
     background: rgba(148, 163, 184, 0.6);
 }
 
-/* Animated gradient backgrounds */
-.gradient-header {
-    background: radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.15) 0%, rgba(16, 185, 129, 0.05) 45%, transparent 70%);
-}
-
 .probability-bar-fill {
-    transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Pulse animation for live indicators */
@@ -127,6 +122,13 @@ body {
     background: linear-gradient(135deg, rgba(244, 63, 94, 0.25), rgba(225, 29, 72, 0.4));
     color: #fb7185;
     border: 1px solid rgba(244, 63, 94, 0.5);
+}
+
+/* +EV Value Bet Badge */
+.badge-ev {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.3));
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.5);
 }
 
 /* Modal Transitions */

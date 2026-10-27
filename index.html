@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoalMatrix Pro - Worldwide Football Predictions (Over 2.5, BTTS, DNB & 1st 10m Draw)</title>
+    <title>GoalMatrix Pro - Worldwide Football Predictions (Over 2.5, BTTS, DNB, Simulator & Acca Builder)</title>
     
     <!-- PWA Manifest & Meta -->
     <link rel="manifest" href="manifest.json">
@@ -49,17 +49,27 @@
                 <div>
                     <div class="flex items-center space-x-2">
                         <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-sky-400 to-emerald-300 bg-clip-text text-transparent">GoalMatrix Pro</span>
-                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">v3.0 Multi-Market</span>
+                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">v4.0 Quant Suite</span>
                     </div>
-                    <p class="text-[11px] text-slate-400 hidden sm:block">Worldwide Over 2.5, BTTS, Draw-No-Bet & First 10m Draw Analytics</p>
+                    <p class="text-[11px] text-slate-400 hidden sm:block">Worldwide Over 2.5, BTTS, Draw-No-Bet & Custom Simulator</p>
                 </div>
             </div>
 
-            <!-- Header Controls: Odds Format Selector, Live status & Sync -->
-            <div class="flex items-center space-x-2.5">
+            <!-- Header Controls: Simulator, Audio, Odds Selector & Refresh -->
+            <div class="flex items-center space-x-2">
+                <!-- Custom Simulator Button -->
+                <button onclick="CustomSimulator.open()" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white text-xs font-bold transition flex items-center space-x-1.5 shadow-md shadow-purple-600/20">
+                    <i class="fa-solid fa-flask text-xs"></i>
+                    <span class="hidden md:inline">Simulator</span>
+                </button>
+
+                <!-- Sound Effects Toggle -->
+                <button id="sound-toggle-btn" class="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 flex items-center justify-center text-xs transition" title="Toggle Sound FX">
+                    <i class="fa-solid fa-volume-high text-emerald-400"></i>
+                </button>
+
                 <!-- Odds Format Switcher -->
-                <div class="flex items-center bg-slate-900 border border-slate-800 rounded-xl px-2 py-1 text-xs">
-                    <span class="text-slate-500 mr-1.5 hidden md:inline text-[11px]">Odds:</span>
+                <div class="flex items-center bg-slate-900 border border-slate-800 rounded-xl px-2 py-1.5 text-xs">
                     <select id="odds-format-select" class="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer text-xs">
                         <option value="decimal">Decimal (@1.65)</option>
                         <option value="fractional">Fractional (13/20)</option>
@@ -67,21 +77,16 @@
                     </select>
                 </div>
 
-                <div class="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-300">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
-                    <span class="hidden lg:inline">Worldwide Feed</span>
-                </div>
-
-                <button id="refresh-btn" class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-sky-500/50 text-slate-200 text-xs font-semibold flex items-center space-x-1.5 transition active:scale-95 shadow-sm">
+                <!-- Sync Button -->
+                <button id="refresh-btn" class="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 hover:border-sky-500/50 text-slate-200 text-xs font-semibold flex items-center justify-center transition active:scale-95 shadow-sm" title="Sync Worldwide Feed">
                     <i class="fa-solid fa-arrows-rotate text-sky-400"></i>
-                    <span class="hidden sm:inline">Sync</span>
                 </button>
             </div>
         </div>
     </header>
 
     <!-- Main Content Container -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-6">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 flex-1 w-full space-y-6">
 
         <!-- Metrics Overview Bar -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -90,7 +95,7 @@
                     <i class="fa-solid fa-globe"></i>
                 </div>
                 <div>
-                    <div class="text-xs text-slate-400 font-medium">Analyzed Matches</div>
+                    <div class="text-xs text-slate-400 font-medium">Real Matches Analyzed</div>
                     <div id="stat-total-matches" class="text-2xl font-extrabold text-slate-100 mono">--</div>
                 </div>
             </div>
@@ -100,18 +105,18 @@
                     <i class="fa-solid fa-fire"></i>
                 </div>
                 <div>
-                    <div class="text-xs text-slate-400 font-medium">Prime Picks (75%+)</div>
+                    <div class="text-xs text-slate-400 font-medium">Prime Banker Picks</div>
                     <div id="stat-high-prob-count" class="text-2xl font-extrabold text-emerald-400 mono">--</div>
                 </div>
             </div>
 
             <div class="glass-panel p-4 rounded-2xl border border-slate-800 flex items-center space-x-4">
                 <div class="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-xl">
-                    <i class="fa-solid fa-stopwatch text-amber-400"></i>
+                    <i class="fa-solid fa-chart-line text-amber-400"></i>
                 </div>
                 <div>
-                    <div class="text-xs text-slate-400 font-medium">1st 10m Draw Rate</div>
-                    <div class="text-2xl font-extrabold text-amber-400 mono">88.5%</div>
+                    <div class="text-xs text-slate-400 font-medium">+EV Edge Threshold</div>
+                    <div class="text-2xl font-extrabold text-amber-400 mono">+12%</div>
                 </div>
             </div>
 
@@ -129,6 +134,32 @@
         <!-- Banker of the Day Banner -->
         <div id="banker-banner">
             <!-- Dynamically injected via App.renderBankerBanner -->
+        </div>
+
+        <!-- 1-Click Smart Acca Presets Bar -->
+        <div class="glass-panel p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gradient-to-r from-slate-900/80 to-slate-950/80">
+            <div class="flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-400 pulse-dot"></span>
+                <span class="text-xs font-bold text-slate-200 uppercase tracking-wider">1-Click Smart Acca Presets:</span>
+            </div>
+            <div class="flex items-center flex-wrap gap-2">
+                <button onclick="AccaPresets.loadBanker()" class="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 text-xs font-bold transition flex items-center space-x-1">
+                    <i class="fa-solid fa-shield text-[11px]"></i>
+                    <span>🛡️ Safe Banker 2.5x</span>
+                </button>
+                <button onclick="AccaPresets.loadOver25GoalRush()" class="px-3 py-1.5 rounded-xl bg-sky-500/20 text-sky-300 border border-sky-500/40 hover:bg-sky-500/30 text-xs font-bold transition flex items-center space-x-1">
+                    <i class="fa-solid fa-futbol text-[11px]"></i>
+                    <span>⚽ Goal Rush 4.5x</span>
+                </button>
+                <button onclick="AccaPresets.loadBttsLock()" class="px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 text-xs font-bold transition flex items-center space-x-1">
+                    <i class="fa-solid fa-handshake text-[11px]"></i>
+                    <span>🥅 BTTS Lock 4.0x</span>
+                </button>
+                <button onclick="AccaPresets.loadMega10x()" class="px-3 py-1.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/40 hover:bg-purple-500/30 text-xs font-bold transition flex items-center space-x-1">
+                    <i class="fa-solid fa-rocket text-[11px]"></i>
+                    <span>🚀 Mega 10x Acca</span>
+                </button>
+            </div>
         </div>
 
         <!-- Filter & Date Controls Card -->
@@ -161,13 +192,9 @@
                         <i class="fa-solid fa-bolt text-yellow-400"></i>
                         <span>Over 1.5 Banker</span>
                     </button>
-                    <button data-tab="combo" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 transition flex items-center space-x-1.5 whitespace-nowrap">
-                        <i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i>
-                        <span>O2.5 & BTTS</span>
-                    </button>
-                    <button data-tab="results" class="px-3.5 py-2 rounded-xl text-xs font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-500/40 hover:border-emerald-400/70 transition flex items-center space-x-1.5 whitespace-nowrap">
-                        <i class="fa-solid fa-square-check"></i>
-                        <span>Results (Hit Rates)</span>
+                    <button data-tab="corners" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 transition flex items-center space-x-1.5 whitespace-nowrap">
+                        <i class="fa-solid fa-flag text-indigo-400"></i>
+                        <span>Corners & Cards</span>
                     </button>
                     <button data-tab="all" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 transition flex items-center space-x-1.5 whitespace-nowrap">
                         <i class="fa-solid fa-list-ul text-slate-400"></i>
@@ -185,20 +212,17 @@
 
             <!-- Search Bar, League Selector, and Confidence Filter -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t border-slate-800/80">
-                <!-- Search Input -->
                 <div class="relative">
                     <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
                     <input id="search-input" type="text" placeholder="Search team, club, or country..." class="w-full bg-slate-950/70 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 transition">
                 </div>
 
-                <!-- League Select Dropdown -->
                 <div>
                     <select id="league-select" class="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-sky-500 transition cursor-pointer">
                         <option value="all">🌍 All Worldwide Leagues</option>
                     </select>
                 </div>
 
-                <!-- Confidence Threshold Slider -->
                 <div class="flex items-center space-x-3 bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-1.5">
                     <span class="text-xs text-slate-400 whitespace-nowrap">Min Prob:</span>
                     <input id="confidence-slider" type="range" min="50" max="85" step="1" value="70" class="w-full accent-emerald-400 cursor-pointer">
@@ -209,13 +233,11 @@
 
         <!-- Matches Grid Container & Loading Spinner -->
         <div class="relative min-h-[300px]">
-            <!-- Loading Indicator -->
             <div id="loading-spinner" class="hidden absolute inset-0 bg-slate-950/60 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center z-10 space-y-3">
                 <i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-400"></i>
-                <p class="text-xs text-slate-300 font-medium">Extracting global matches & computing multi-market Poisson model...</p>
+                <p class="text-xs text-slate-300 font-medium">Loading match probabilities & +EV edge calculations...</p>
             </div>
 
-            <!-- Matches List -->
             <div id="matches-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 <!-- Injected via app.js -->
             </div>
@@ -227,6 +249,60 @@
     <div id="match-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
         <div id="modal-content" class="glass-panel border border-slate-700/80 rounded-3xl p-6 max-w-lg w-full shadow-2xl modal-enter">
             <!-- Injected via App.openModal -->
+        </div>
+    </div>
+
+    <!-- Custom Match Simulator Modal -->
+    <div id="sim-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+        <div class="glass-panel border border-purple-500/40 rounded-3xl p-6 max-w-lg w-full shadow-2xl modal-enter space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div class="flex items-center space-x-2">
+                    <span class="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/40 flex items-center justify-center">
+                        <i class="fa-solid fa-flask"></i>
+                    </span>
+                    <div>
+                        <h3 class="font-bold text-sm text-slate-100">Custom Match Simulator</h3>
+                        <p class="text-[11px] text-slate-400">Simulate any two teams with Dixon-Coles Poisson</p>
+                    </div>
+                </div>
+                <button onclick="CustomSimulator.close()" class="w-8 h-8 rounded-full bg-slate-900 border border-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Simulator Input Controls -->
+            <div class="grid grid-cols-2 gap-3 text-xs">
+                <div class="space-y-1">
+                    <label class="text-slate-400 font-semibold text-[11px]">Home Team</label>
+                    <input id="sim-home-name" type="text" value="Arsenal" oninput="CustomSimulator.runSimulation()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-slate-200">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-slate-400 font-semibold text-[11px]">Away Team</label>
+                    <input id="sim-away-name" type="text" value="Inter Milan" oninput="CustomSimulator.runSimulation()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-slate-200">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-xs bg-slate-950/70 p-3 rounded-2xl border border-slate-800">
+                <div>
+                    <div class="flex items-center justify-between text-[11px] mb-1">
+                        <span class="text-sky-400 font-bold">Home xG:</span>
+                        <span id="sim-home-xg-val" class="mono font-bold">1.85</span>
+                    </div>
+                    <input id="sim-home-xg" type="range" min="0.4" max="3.5" step="0.05" value="1.85" oninput="document.getElementById('sim-home-xg-val').textContent = this.value; CustomSimulator.runSimulation();" class="w-full accent-sky-400 cursor-pointer">
+                </div>
+                <div>
+                    <div class="flex items-center justify-between text-[11px] mb-1">
+                        <span class="text-amber-400 font-bold">Away xG:</span>
+                        <span id="sim-away-xg-val" class="mono font-bold">1.35</span>
+                    </div>
+                    <input id="sim-away-xg" type="range" min="0.4" max="3.5" step="0.05" value="1.35" oninput="document.getElementById('sim-away-xg-val').textContent = this.value; CustomSimulator.runSimulation();" class="w-full accent-amber-400 cursor-pointer">
+                </div>
+            </div>
+
+            <!-- Dynamic Simulation Results -->
+            <div id="sim-results">
+                <!-- Dynamically generated via CustomSimulator.runSimulation -->
+            </div>
         </div>
     </div>
 
@@ -265,7 +341,7 @@
                 <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
                     <div class="flex items-center space-x-1.5">
                         <span class="text-slate-400">Stake ($):</span>
-                        <input id="slip-stake-input" type="number" min="1" max="10000" value="10" class="w-16 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs mono font-bold text-slate-200 focus:outline-none focus:border-emerald-500">
+                        <input id="slip-stake-input" type="number" min="1" max="10000" value="20" class="w-16 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs mono font-bold text-slate-200 focus:outline-none focus:border-emerald-500">
                     </div>
                     <div class="text-right">
                         <div class="text-[10px] text-slate-500 uppercase">Payout</div>
@@ -295,7 +371,7 @@
     <!-- Footer -->
     <footer class="border-t border-slate-900 bg-slate-950 py-6 mt-12 text-center text-xs text-slate-500">
         <div class="max-w-7xl mx-auto px-4 space-y-2">
-            <p>GoalMatrix Pro v3.0 • Multi-Market Goal Expectancy, Draw-No-Bet & 1st 10m Draw Modeling</p>
+            <p>GoalMatrix Pro v4.0 Quant Suite • Multi-Market Goal Expectancy, Custom Simulator & +EV Analytics</p>
             <p class="text-[11px] text-slate-600">Disclaimer: Predictions are mathematical models based on statistical probabilities and historical data. Gamble responsibly.</p>
         </div>
     </footer>
