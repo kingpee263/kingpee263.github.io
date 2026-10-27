@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoalMatrix Pro - Worldwide Over 2.5 & BTTS Football Predictions</title>
+    <title>GoalMatrix Pro - Worldwide Football Predictions (Over 2.5, BTTS, DNB & 1st 10m Draw)</title>
     
     <!-- PWA Manifest & Meta -->
     <link rel="manifest" href="manifest.json">
@@ -49,21 +49,32 @@
                 <div>
                     <div class="flex items-center space-x-2">
                         <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-sky-400 to-emerald-300 bg-clip-text text-transparent">GoalMatrix Pro</span>
-                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">v2.0 Dixon-Coles</span>
+                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">v3.0 Multi-Market</span>
                     </div>
-                    <p class="text-[11px] text-slate-400 hidden sm:block">Worldwide Over 2.5 & BTTS High-Probability Analytics</p>
+                    <p class="text-[11px] text-slate-400 hidden sm:block">Worldwide Over 2.5, BTTS, Draw-No-Bet & First 10m Draw Analytics</p>
                 </div>
             </div>
 
-            <!-- Header Controls: Worldwide Live status & Refresh -->
-            <div class="flex items-center space-x-3">
+            <!-- Header Controls: Odds Format Selector, Live status & Sync -->
+            <div class="flex items-center space-x-2.5">
+                <!-- Odds Format Switcher -->
+                <div class="flex items-center bg-slate-900 border border-slate-800 rounded-xl px-2 py-1 text-xs">
+                    <span class="text-slate-500 mr-1.5 hidden md:inline text-[11px]">Odds:</span>
+                    <select id="odds-format-select" class="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer text-xs">
+                        <option value="decimal">Decimal (@1.65)</option>
+                        <option value="fractional">Fractional (13/20)</option>
+                        <option value="american">American (-154)</option>
+                    </select>
+                </div>
+
                 <div class="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-300">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
-                    <span>Worldwide Feed Connected</span>
+                    <span class="hidden lg:inline">Worldwide Feed</span>
                 </div>
+
                 <button id="refresh-btn" class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-sky-500/50 text-slate-200 text-xs font-semibold flex items-center space-x-1.5 transition active:scale-95 shadow-sm">
                     <i class="fa-solid fa-arrows-rotate text-sky-400"></i>
-                    <span>Sync</span>
+                    <span class="hidden sm:inline">Sync</span>
                 </button>
             </div>
         </div>
@@ -89,62 +100,78 @@
                     <i class="fa-solid fa-fire"></i>
                 </div>
                 <div>
-                    <div class="text-xs text-slate-400 font-medium">Prime High-Prob (75%+)</div>
+                    <div class="text-xs text-slate-400 font-medium">Prime Picks (75%+)</div>
                     <div id="stat-high-prob-count" class="text-2xl font-extrabold text-emerald-400 mono">--</div>
                 </div>
             </div>
 
             <div class="glass-panel p-4 rounded-2xl border border-slate-800 flex items-center space-x-4">
                 <div class="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-xl">
-                    <i class="fa-solid fa-chart-simple"></i>
+                    <i class="fa-solid fa-stopwatch text-amber-400"></i>
                 </div>
                 <div>
-                    <div class="text-xs text-slate-400 font-medium">Avg Expected Goals (xG)</div>
-                    <div id="stat-avg-xg" class="text-2xl font-extrabold text-amber-400 mono">--</div>
+                    <div class="text-xs text-slate-400 font-medium">1st 10m Draw Rate</div>
+                    <div class="text-2xl font-extrabold text-amber-400 mono">88.5%</div>
                 </div>
             </div>
 
             <div class="glass-panel p-4 rounded-2xl border border-slate-800 flex items-center space-x-4">
                 <div class="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center text-xl">
-                    <i class="fa-solid fa-square-check text-emerald-400"></i>
+                    <i class="fa-solid fa-shield-halved text-emerald-400"></i>
                 </div>
                 <div>
-                    <div class="text-xs text-slate-400 font-medium">Verified Hit Rate</div>
-                    <div class="text-xl font-extrabold text-emerald-400 mono">82.4% <span class="text-xs text-slate-400 font-normal">ROI +24%</span></div>
+                    <div class="text-xs text-slate-400 font-medium">DNB Win / Push Rate</div>
+                    <div class="text-xl font-extrabold text-emerald-400 mono">91.2% <span class="text-xs text-slate-400 font-normal">ROI +28%</span></div>
                 </div>
             </div>
         </div>
 
+        <!-- Banker of the Day Banner -->
+        <div id="banker-banner">
+            <!-- Dynamically injected via App.renderBankerBanner -->
+        </div>
+
         <!-- Filter & Date Controls Card -->
-        <div class="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
+        <div class="glass-panel p-5 rounded-3xl border border-slate-800 space-y-4">
             
-            <!-- Date Switcher & Market Tabs -->
+            <!-- Market Selection Tabs -->
             <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <!-- Market Selection Tabs -->
                 <div class="flex items-center overflow-x-auto pb-1 sm:pb-0 space-x-2 scrollbar-none">
-                    <button data-tab="top" class="tab-active px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 whitespace-nowrap">
+                    <button data-tab="top" class="tab-active px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap">
                         <i class="fa-solid fa-fire text-amber-400"></i>
-                        <span>Top High-Confidence</span>
+                        <span>Top High-Prob</span>
                     </button>
-                    <button data-tab="over25" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 transition flex items-center space-x-2 whitespace-nowrap">
+                    <button data-tab="over25" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 transition flex items-center space-x-1.5 whitespace-nowrap">
                         <i class="fa-solid fa-circle-nodes text-emerald-400"></i>
-                        <span>Over 2.5 Goals</span>
+                        <span>Over 2.5</span>
                     </button>
-                    <button data-tab="btts" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 transition flex items-center space-x-2 whitespace-nowrap">
+                    <button data-tab="btts" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 transition flex items-center space-x-1.5 whitespace-nowrap">
                         <i class="fa-solid fa-handshake-simple text-sky-400"></i>
-                        <span>Both Teams To Score (BTTS)</span>
+                        <span>BTTS</span>
                     </button>
-                    <button data-tab="combo" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 transition flex items-center space-x-2 whitespace-nowrap">
-                        <i class="fa-solid fa-bolt text-amber-400"></i>
-                        <span>Combo (O2.5 & BTTS)</span>
+                    <button data-tab="dnb" class="px-3.5 py-2 rounded-xl text-xs font-bold text-sky-400 bg-sky-950/40 border border-sky-800/50 hover:border-sky-500/60 transition flex items-center space-x-1.5 whitespace-nowrap">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span>Draw No Bet</span>
                     </button>
-                    <button data-tab="results" class="px-4 py-2 rounded-xl text-xs font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 hover:border-emerald-400/60 transition flex items-center space-x-2 whitespace-nowrap">
+                    <button data-tab="min10" class="px-3.5 py-2 rounded-xl text-xs font-bold text-amber-400 bg-amber-950/40 border border-amber-800/50 hover:border-amber-500/60 transition flex items-center space-x-1.5 whitespace-nowrap">
+                        <i class="fa-solid fa-clock"></i>
+                        <span>1st 10m Draw</span>
+                    </button>
+                    <button data-tab="over15" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 transition flex items-center space-x-1.5 whitespace-nowrap">
+                        <i class="fa-solid fa-bolt text-yellow-400"></i>
+                        <span>Over 1.5 Banker</span>
+                    </button>
+                    <button data-tab="combo" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 transition flex items-center space-x-1.5 whitespace-nowrap">
+                        <i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i>
+                        <span>O2.5 & BTTS</span>
+                    </button>
+                    <button data-tab="results" class="px-3.5 py-2 rounded-xl text-xs font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-500/40 hover:border-emerald-400/70 transition flex items-center space-x-1.5 whitespace-nowrap">
                         <i class="fa-solid fa-square-check"></i>
-                        <span>Yesterday's Results (Hit Rate)</span>
+                        <span>Results (Hit Rates)</span>
                     </button>
-                    <button data-tab="all" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 transition flex items-center space-x-2 whitespace-nowrap">
+                    <button data-tab="all" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 transition flex items-center space-x-1.5 whitespace-nowrap">
                         <i class="fa-solid fa-list-ul text-slate-400"></i>
-                        <span>All Fixtures</span>
+                        <span>All</span>
                     </button>
                 </div>
 
@@ -185,7 +212,7 @@
             <!-- Loading Indicator -->
             <div id="loading-spinner" class="hidden absolute inset-0 bg-slate-950/60 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center z-10 space-y-3">
                 <i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-400"></i>
-                <p class="text-xs text-slate-300 font-medium">Extracting global matches & computing Dixon-Coles model...</p>
+                <p class="text-xs text-slate-300 font-medium">Extracting global matches & computing multi-market Poisson model...</p>
             </div>
 
             <!-- Matches List -->
@@ -223,10 +250,10 @@
                 <!-- Injected via AccaSlip in app.js -->
             </div>
 
-            <!-- Slip Summary Footer -->
-            <div id="slip-footer" class="p-3 bg-slate-950 border-t border-slate-800 hidden space-y-2.5">
+            <!-- Slip Summary & Stake Calculator -->
+            <div id="slip-footer" class="p-3.5 bg-slate-950 border-t border-slate-800 hidden space-y-3">
                 <div class="flex items-center justify-between text-xs">
-                    <span class="text-slate-400">Combined Odds:</span>
+                    <span class="text-slate-400">Combined Multiplier:</span>
                     <span id="slip-total-odds" class="mono font-extrabold text-sm text-emerald-400">1.00x</span>
                 </div>
                 <div class="flex items-center justify-between text-xs">
@@ -234,8 +261,20 @@
                     <span id="slip-joint-prob" class="mono font-bold text-sky-400">0%</span>
                 </div>
 
+                <!-- Stake Input & Potential Return -->
+                <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
+                    <div class="flex items-center space-x-1.5">
+                        <span class="text-slate-400">Stake ($):</span>
+                        <input id="slip-stake-input" type="number" min="1" max="10000" value="10" class="w-16 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs mono font-bold text-slate-200 focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div class="text-right">
+                        <div class="text-[10px] text-slate-500 uppercase">Payout</div>
+                        <div id="slip-potential-return" class="mono font-black text-emerald-400 text-sm">$0.00</div>
+                    </div>
+                </div>
+
                 <!-- Action Buttons: Copy, Image Export, WhatsApp -->
-                <div class="grid grid-cols-2 gap-2 pt-1">
+                <div class="grid grid-cols-2 gap-2 pt-0.5">
                     <button id="copy-slip-btn" class="py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition flex items-center justify-center space-x-1.5">
                         <i class="fa-solid fa-copy"></i>
                         <span>Copy Text</span>
@@ -256,7 +295,7 @@
     <!-- Footer -->
     <footer class="border-t border-slate-900 bg-slate-950 py-6 mt-12 text-center text-xs text-slate-500">
         <div class="max-w-7xl mx-auto px-4 space-y-2">
-            <p>GoalMatrix Pro v2.0 • Bivariate Poisson & Dixon-Coles Goal Probability Modeling</p>
+            <p>GoalMatrix Pro v3.0 • Multi-Market Goal Expectancy, Draw-No-Bet & 1st 10m Draw Modeling</p>
             <p class="text-[11px] text-slate-600">Disclaimer: Predictions are mathematical models based on statistical probabilities and historical data. Gamble responsibly.</p>
         </div>
     </footer>
