@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deriv Quant — Digit Statistics & Pattern Recognition Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Top Navigation & Connection Bar -->
+  <header class="top-nav">
+    <div class="brand">
+      <div class="brand-logo">DQ</div>
+      <div>
+        <div class="brand-title">DERIV QUANT // DIGIT DIFFERS &amp; PATTERN ENGINE</div>
+        <div class="brand-subtitle">Markov Chain, Frequency Skew &amp; Recurrence Drought Terminal (~90% Win-Rate Architecture)</div>
+      </div>
+    </div>
+
+    <div class="nav-controls">
+      <div class="control-pill">
+        <label for="symbolSelect">Synthetic Index</label>
+        <select id="symbolSelect">
+          <option value="1HZ100V" selected>Volatility 100 (1s) [1HZ100V]</option>
+          <option value="R_100">Volatility 100 [R_100]</option>
+          <option value="1HZ75V">Volatility 75 (1s) [1HZ75V]</option>
+          <option value="R_75">Volatility 75 [R_75]</option>
+          <option value="1HZ50V">Volatility 50 (1s) [1HZ50V]</option>
+          <option value="R_50">Volatility 50 [R_50]</option>
+          <option value="1HZ25V">Volatility 25 (1s) [1HZ25V]</option>
+          <option value="R_25">Volatility 25 [R_25]</option>
+          <option value="1HZ10V">Volatility 10 (1s) [1HZ10V]</option>
+          <option value="R_10">Volatility 10 [R_10]</option>
+          <option value="JD100">Jump 100 Index [JD100]</option>
+        </select>
+      </div>
+
+      <div class="control-pill">
+        <label for="windowSelect">Sample Window</label>
+        <select id="windowSelect">
+          <option value="100">Last 100 Ticks</option>
+          <option value="250">Last 250 Ticks</option>
+          <option value="500" selected>Last 500 Ticks</option>
+          <option value="1000">Last 1,000 Ticks</option>
+        </select>
+      </div>
+
+      <div class="control-pill">
+        <label for="execModeSelect">Execution Mode</label>
+        <select id="execModeSelect">
+          <option value="PAPER" selected>Paper Simulation (Live Ticks)</option>
+          <option value="LIVE">Deriv API Account (Token)</option>
+        </select>
+      </div>
+
+      <div class="control-pill" id="apiTokenContainer" style="display: none;">
+        <label for="apiTokenInput">API Token</label>
+        <input type="password" id="apiTokenInput" placeholder="Paste Deriv Token..." style="width: 145px;" />
+        <button class="btn btn-secondary" id="authorizeBtn" style="min-width: auto; padding: 5px 10px;">Auth</button>
+      </div>
+
+      <div class="control-pill">
+        <label for="soundToggle">Audio FX</label>
+        <input type="checkbox" id="soundToggle" checked style="cursor: pointer;" />
+      </div>
+
+      <div id="wsStatusBadge" class="status-badge disconnected">
+        <span class="status-dot"></span>
+        <span id="wsStatusText">Connecting...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Live Hero Metrics Strip -->
+  <section class="ticker-strip">
+    <div class="metric-box">
+      <div class="metric-label">Live Quote &amp; Last Digit</div>
+      <div class="metric-value">
+        <span id="livePriceDisplay">---.--</span>
+        <span id="liveDigitBadge" class="quote-last-digit">-</span>
+      </div>
+      <div class="metric-sub" id="tickCountSub">Buffer: 0 / 500 ticks</div>
+    </div>
+
+    <div class="metric-box">
+      <div class="metric-label">Optimal High-Probability Target</div>
+      <div class="metric-value" style="color: var(--accent-emerald);">
+        <span id="bestTargetPrefix">DIFF</span> <span id="bestTargetDigit" style="font-size: 24px;">-</span>
+      </div>
+      <div class="metric-sub" id="bestTargetReason">Calculating Markov &amp; Frequency...</div>
+    </div>
+
+    <div class="metric-box">
+      <div class="metric-label">Signal Confidence &amp; Regime</div>
+      <div class="metric-value" id="confidenceDisplay">0.0%</div>
+      <div class="metric-sub" id="chiSquareSub">Chi-Sq (χ²): -- | Entropy: --</div>
+    </div>
+
+    <div class="metric-box">
+      <div class="metric-label">Session Win Rate</div>
+      <div class="metric-value" id="winRateDisplay">0.0%</div>
+      <div class="metric-sub" id="winLossSub">0W / 0L (0 Total)</div>
+    </div>
+
+    <div class="metric-box">
+      <div class="metric-label">Balance &amp; Net Session PnL</div>
+      <div class="metric-value">
+        <span id="balanceDisplay">$1,000.00</span>
+      </div>
+      <div class="metric-sub" id="netPnlDisplay">Net PnL: $0.00 (0.00%)</div>
+    </div>
+  </section>
+
+  <!-- Main Workspace Two-Column Grid -->
+  <main class="workspace-grid">
+
+    <!-- Left Column: Real-Time Digit Statistics & Pattern Recognition -->
+    <div class="col-stack">
+
+      <!-- Live Tick Digit Tape -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>Live Tick Stream (Last 25 Digits)</span>
+          </div>
+          <span class="card-badge" id="evenOddRatioBadge">Even: 50% | Odd: 50%</span>
+        </div>
+        <div class="card-body">
+          <div class="tick-tape" id="tickTape"></div>
+        </div>
+      </div>
+
+      <!-- Rolling Digit Distribution & Drought Analyzer (0-9) -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>Digit Frequency Distribution &amp; Recurrence Drought (0–9)</span>
+          </div>
+          <span class="card-badge">Dashed Line = 10.0% Expected Uniform</span>
+        </div>
+        <div class="card-body">
+          <div class="digit-grid" id="digitDistributionGrid">
+            <!-- Populated dynamically by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 1st-Order Markov Transition Matrix Heatmap -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>1st-Order Markov Chain Transition Matrix — P(Next = Col | Current = Row)</span>
+          </div>
+          <span class="card-badge" id="activeMarkovRowBadge">Current Row: -</span>
+        </div>
+        <div class="card-body markov-container">
+          <table class="markov-table" id="markovTable">
+            <!-- Populated dynamically by JS -->
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: Automated Bot Engine, Risk Manager & Trade Log -->
+    <div class="col-stack">
+
+      <!-- Signal & Strategy Controls Card -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>Strategy &amp; Risk Management Engine (Anti-Bust Guardrails)</span>
+          </div>
+          <span class="card-badge" id="botStateBadge">IDLE</span>
+        </div>
+        <div class="card-body">
+
+          <!-- Live Signal Banner -->
+          <div class="signal-banner" style="margin-bottom: 14px;">
+            <div class="signal-main">
+              <div class="signal-target-box">
+                <span id="bannerContractPrefix">DIFF</span>
+                <strong id="bannerTargetDigit">-</strong>
+              </div>
+              <div>
+                <div style="font-weight: 700; font-size: 14px;" id="bannerSignalTitle">Waiting for Tick History...</div>
+                <div style="font-size: 11px; color: var(--text-secondary);" id="bannerSignalSub">
+                  P(Match): --% | Theoretical Differ Edge: --%
+                </div>
+              </div>
+            </div>
+            <div style="text-align: right; font-family: var(--font-mono);">
+              <div style="font-size: 11px; color: var(--text-secondary);">Next Stake</div>
+              <div style="font-size: 16px; font-weight: 700; color: var(--accent-cyan);" id="nextStakePreview">$10.00</div>
+            </div>
+          </div>
+
+          <div class="settings-grid">
+            <div class="form-group">
+              <label for="contractTypeSelect">High Win-Rate Contract Type</label>
+              <select id="contractTypeSelect">
+                <option value="DIGITDIFF" selected>DIGIT DIFFERS (~90% Win Rate, ~9.6% Payout)</option>
+                <option value="DIGITOVER_0">DIGIT OVER 0 (~90% Win Rate, ~9.6% Payout)</option>
+                <option value="DIGITUNDER_9">DIGIT UNDER 9 (~90% Win Rate, ~9.6% Payout)</option>
+                <option value="DIGITOVER_1">DIGIT OVER 1 (~80% Win Rate, ~23.5% Payout)</option>
+                <option value="DIGITUNDER_8">DIGIT UNDER 8 (~80% Win Rate, ~23.5% Payout)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="strategyModeSelect">Target Selection Algorithm</label>
+              <select id="strategyModeSelect">
+                <option value="HYBRID" selected>Hybrid Ensemble (Markov Min + Coldest + Anti-Streak)</option>
+                <option value="MARKOV_ZERO">Strict Markov Zero-Transition Filter (P ≤ 4%)</option>
+                <option value="MARKOV_MIN">Lowest Markov Transition P(Next | Current)</option>
+                <option value="COLDEST">Coldest Digit (Lowest Rolling Frequency)</option>
+                <option value="POST_CLUSTER">Cluster Exhaustion (After 2x Repeat)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="baseStakeInput">Base Stake ($ USD)</label>
+              <input type="number" id="baseStakeInput" value="10" min="0.35" step="0.5" />
+            </div>
+
+            <div class="form-group">
+              <label for="sizingModeSelect">Position Sizing / Recovery Mode</label>
+              <select id="sizingModeSelect">
+                <option value="DALEMBERT" selected>Capped D'Alembert (+1 Unit on Loss, -1 on Win)</option>
+                <option value="FLAT">Flat Stake (Zero Progression - Safest)</option>
+                <option value="SPLIT_RECOVERY">3-Step Split Recovery (Capped at 3.5x)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="minConfidenceInput">Min Confidence Threshold (%)</label>
+              <input type="number" id="minConfidenceInput" value="76" min="50" max="98" step="1" />
+            </div>
+
+            <div class="form-group">
+              <label for="cooldownTicksInput">Cooldown Between Trades (Ticks)</label>
+              <input type="number" id="cooldownTicksInput" value="2" min="1" max="20" step="1" />
+            </div>
+
+            <div class="form-group">
+              <label for="takeProfitInput">Session Take Profit ($ USD)</label>
+              <input type="number" id="takeProfitInput" value="50" min="1" step="1" />
+            </div>
+
+            <div class="form-group">
+              <label for="stopLossInput">Session Max Stop Loss ($ USD)</label>
+              <input type="number" id="stopLossInput" value="50" min="1" step="1" />
+            </div>
+
+            <div class="form-group">
+              <label for="maxConsecLossesInput">Circuit Breaker (Max Consec Losses)</label>
+              <input type="number" id="maxConsecLossesInput" value="2" min="1" max="10" step="1" />
+            </div>
+
+            <div class="form-group">
+              <label for="durationTicksInput">Contract Duration (Ticks)</label>
+              <input type="number" id="durationTicksInput" value="1" min="1" max="10" step="1" />
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-start" id="startBotBtn">▶ START AUTO BOT</button>
+            <button class="btn btn-stop" id="stopBotBtn" disabled>■ STOP BOT</button>
+            <button class="btn btn-snipe" id="manualSnipeBtn">⚡ SNIPE 1 TRADE NOW</button>
+            <button class="btn btn-secondary" id="resetSessionBtn">↺ RESET STATS</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Equity Curve & Execution Log Card -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>Real-Time Equity Curve &amp; Trade Execution Ledger</span>
+          </div>
+          <span class="card-badge" id="streakBadge">Streak: 0</span>
+        </div>
+        <div class="card-body">
+          <div class="equity-canvas-wrap">
+            <canvas id="equityCanvas"></canvas>
+          </div>
+
+          <div class="table-scroll">
+            <table class="trade-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Time</th>
+                  <th>Contract</th>
+                  <th>Entry</th>
+                  <th>Exit (Digit)</th>
+                  <th>Stake</th>
+                  <th>PnL</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="tradeTableBody">
+                <tr>
+                  <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                    No trades executed yet. Start Auto Bot or click "Snipe 1 Trade Now" to test against live Deriv ticks.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
