@@ -1,13 +1,23 @@
 /**
- * DERIV QUANT — Digit Statistics & Pattern Recognition Terminal
- * Connects directly to Deriv WebSocket API v3 (wss://ws.derivws.com/websockets/v3?app_id=1089)
- * Preloads 1,000 historical ticks via ticks_history + live tick subscription.
+ * DERIV QUANT — Digit Statistics & Real-Time Trading Terminal
+ * Official Deriv WebSocket v3 API Integration
+ * Supports:
+ * - Official Deriv OAuth2 Login (Multi-Account Switcher: Real CR vs Demo VRTC)
+ * - Direct API Token Authentication (with localStorage persistence)
+ * - 1,000 Historical Ticks Preload + Live Tick Stream across all Synthetic Indices
+ * - 1st-Order Markov Chain Transition Matrix + Drought & Frequency Ensemble
+ * - Automated Capped D'Alembert & Split Recovery Money Management
+ * - Live Proposal & Buy Execution with real contract tracking
  */
 
-const DERIV_WS_URL = 'wss://ws.derivws.com/websockets/v3?app_id=1089';
+const DEFAULT_DERIV_APP_ID = '1089';
+const DERIV_WS_BASE = 'wss://ws.derivws.com/websockets/v3';
 
 class DerivDigitBot {
   constructor() {
+    this.appId = localStorage.getItem('deriv_app_id') || DEFAULT_DERIV_APP_ID;
+    this.wsUrl = `${DERIV_WS_BASE}?app_id=${this.appId}`;
+
     // WebSocket state
     this.ws = null;
     this.pingInterval = null;
@@ -17,14 +27,18 @@ class DerivDigitBot {
     this.currentSymbol = '1HZ100V';
     this.windowSize = 500;
 
-    // Web Audio Context for subtle quantitative sound effects
+    // Accounts State (OAuth & Manual Tokens)
+    this.accounts = []; // [{ loginid, token, currency, isVirtual }]
+    this.activeAccount = null;
+
+    // Web Audio FX
     this.audioCtx = null;
 
-    // Tick & Digit Ring Buffer (up to 1000 ticks)
+    // Tick & Digit Ring Buffer (up to 1,000 ticks)
     this.ticks = []; // { epoch, quote, quoteStr, digit }
     this.maxBuffer = 1000;
 
-    // Computed Analytics State
+    // Quantitative Statistics State
     this.stats = {
       freqCounts: new Array(10).fill(0),
       freqPcts: new Array(10).fill(10),
@@ -54,33 +68,43 @@ class DerivDigitBot {
     this.totalTrades = 0;
     this.wins = 0;
     this.losses = 0;
-    this.currentStreak = 0; // + for win streak, - for loss streak
+    this.currentStreak = 0;
     this.consecLosses = 0;
     this.dalembertStep = 0;
     this.recoveryLossPool = 0;
     this.ticksSinceLastTrade = 999;
 
-    // Active Paper/Live Open Contract
+    // Active Contract
     this.activeContract = null;
     this.tradeHistory = [];
 
     this.initDOM();
+    this.parseOAuthRedirect();
+    this.loadSavedAccounts();
     this.renderInitialGrids();
     this.drawEquityCurve();
     this.connectWebSocket();
   }
 
+  /* ============================================================================
+   * INITIALIZATION & DOM BINDING
+   * ============================================================================ */
   initDOM() {
-    // Controls
+    // Header & Auth
     this.symbolSelect = document.getElementById('symbolSelect');
-    this.windowSelect = document.getElementById('windowSelect');
     this.execModeSelect = document.getElementById('execModeSelect');
-    this.apiTokenContainer = document.getElementById('apiTokenContainer');
-    this.apiTokenInput = document.getElementById('apiTokenInput');
-    this.authorizeBtn = document.getElementById('authorizeBtn');
+    this.accountPill = document.getElementById('accountPill');
+    this.accountTypeTag = document.getElementById('accountTypeTag');
+    this.accountSelect = document.getElementById('accountSelect');
+    this.headerBalance = document.getElementById('headerBalance');
+    this.logoutBtn = document.getElementById('logoutBtn');
+    this.authActionsGroup = document.getElementById('authActionsGroup');
+    this.derivOAuthBtn = document.getElementById('derivOAuthBtn');
+    this.openTokenModalBtn = document.getElementById('openTokenModalBtn');
     this.soundToggle = document.getElementById('soundToggle');
     this.wsStatusBadge = document.getElementById('wsStatusBadge');
     this.wsStatusText = document.getElementById('wsStatusText');
+    this.marketStatusPill = document.getElementById('marketStatusPill');
 
     // Hero Metrics
     this.livePriceDisplay = document.getElementById('livePriceDisplay');
@@ -103,7 +127,7 @@ class DerivDigitBot {
     this.markovTable = document.getElementById('markovTable');
     this.activeMarkovRowBadge = document.getElementById('activeMarkovRowBadge');
 
-    // Right Column Bot Controls
+    // Right Column Strategy & Bot
     this.botStateBadge = document.getElementById('botStateBadge');
     this.bannerContractPrefix = document.getElementById('bannerContractPrefix');
     this.bannerTargetDigit = document.getElementById('bannerTargetDigit');
@@ -131,28 +155,40 @@ class DerivDigitBot {
     this.tradeTableBody = document.getElementById('tradeTableBody');
     this.equityCanvas = document.getElementById('equityCanvas');
 
-    // Event Listeners
+    // Modal
+    this.tokenModal = document.getElementById('tokenModal');
+    this.closeTokenModalBtn = document.getElementById('closeTokenModalBtn');
+    this.modalTokenInput = document.getElementById('modalTokenInput');
+    this.modalAppIdInput = document.getElementById('modalAppIdInput');
+    this.saveTokenBtn = document.getElementById('saveTokenBtn');
+    this.toastContainer = document.getElementById('toastContainer');
+
+    // Listeners
     this.symbolSelect.addEventListener('change', (e) => {
       this.currentSymbol = e.target.value;
       this.subscribeToSymbol(this.currentSymbol);
     });
 
-    this.windowSelect.addEventListener('change', (e) => {
-      this.windowSize = parseInt(e.target.value, 10);
-      this.recalculateStats();
-      this.updateUI();
-    });
-
     this.execModeSelect.addEventListener('change', (e) => {
       this.execMode = e.target.value;
-      this.apiTokenContainer.style.display = this.execMode === 'LIVE' ? 'flex' : 'none';
+      if (this.execMode === 'LIVE' && !this.isAuthorized) {
+        this.showToast('Please log in with Deriv or enter an API token to trade in Live mode.', 'error');
+        this.openTokenModal();
+      }
       this.updateBalanceDisplay();
     });
 
-    this.authorizeBtn.addEventListener('click', () => {
-      const token = this.apiTokenInput.value.trim();
-      if (token && this.ws && this.isConnected) {
-        this.ws.send(JSON.stringify({ authorize: token }));
+    this.derivOAuthBtn.addEventListener('click', () => this.startOAuthLogin());
+    this.openTokenModalBtn.addEventListener('click', () => this.openTokenModal());
+    this.closeTokenModalBtn.addEventListener('click', () => this.closeTokenModal());
+    this.saveTokenBtn.addEventListener('click', () => this.saveManualToken());
+    this.logoutBtn.addEventListener('click', () => this.logout());
+
+    this.accountSelect.addEventListener('change', (e) => {
+      const selectedId = e.target.value;
+      const acct = this.accounts.find(a => a.loginid === selectedId);
+      if (acct) {
+        this.switchAccount(acct);
       }
     });
 
@@ -166,13 +202,8 @@ class DerivDigitBot {
       this.updateUI();
     });
 
-    this.baseStakeInput.addEventListener('input', () => {
-      this.updateNextStakePreview();
-    });
-
-    this.sizingModeSelect.addEventListener('change', () => {
-      this.updateNextStakePreview();
-    });
+    this.baseStakeInput.addEventListener('input', () => this.updateNextStakePreview());
+    this.sizingModeSelect.addEventListener('change', () => this.updateNextStakePreview());
 
     this.startBotBtn.addEventListener('click', () => this.startBot());
     this.stopBotBtn.addEventListener('click', () => this.stopBot('USER STOPPED'));
@@ -180,6 +211,17 @@ class DerivDigitBot {
     this.resetSessionBtn.addEventListener('click', () => this.resetSession());
 
     window.addEventListener('resize', () => this.drawEquityCurve());
+  }
+
+  showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type === 'success' ? 'toast-success' : type === 'error' ? 'toast-error' : ''}`;
+    toast.textContent = message;
+    this.toastContainer.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 300);
+    }, 4500);
   }
 
   playTone(freq = 660, durationMs = 90, type = 'sine') {
@@ -205,58 +247,152 @@ class DerivDigitBot {
     } catch (_) {}
   }
 
-  renderInitialGrids() {
-    // 10 Digit Columns (0-9)
-    let html = '';
-    for (let d = 0; d <= 9; d++) {
-      html += `
-        <div class="digit-col" id="digitCol_${d}">
-          <div class="digit-tag" id="digitTag_${d}"></div>
-          <div class="bar-wrapper">
-            <div class="bar-baseline"></div>
-            <div class="bar-fill" id="digitBar_${d}" style="height: 50%;"></div>
-          </div>
-          <div class="digit-number">${d}</div>
-          <div class="digit-pct" id="digitPct_${d}">10.0%</div>
-          <div class="digit-drought" id="digitDrought_${d}">0t ago</div>
-        </div>
-      `;
-    }
-    this.digitDistributionGrid.innerHTML = html;
+  /* ============================================================================
+   * DERIV OAUTH2 & TOKEN AUTHENTICATION
+   * ============================================================================ */
+  startOAuthLogin() {
+    const oauthUrl = `https://oauth.deriv.com/oauth2/authorize?app_id=${this.appId}&l=en&brand=deriv`;
+    window.location.href = oauthUrl;
+  }
 
-    // 10x10 Markov Table
-    let tableHtml = '<thead><tr><th>Curr \\ Next</th>';
-    for (let c = 0; c <= 9; c++) {
-      tableHtml += `<th>→ ${c}</th>`;
-    }
-    tableHtml += '</tr></thead><tbody>';
-
-    for (let r = 0; r <= 9; r++) {
-      tableHtml += `<tr id="markovRow_${r}"><th>Digit ${r}</th>`;
-      for (let c = 0; c <= 9; c++) {
-        tableHtml += `<td id="markovCell_${r}_${c}">10.0%</td>`;
+  parseOAuthRedirect() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('token1')) {
+      const parsedAccounts = [];
+      let i = 1;
+      while (params.has(`acct${i}`) && params.has(`token${i}`)) {
+        const loginid = params.get(`acct${i}`);
+        const token = params.get(`token${i}`);
+        const currency = params.get(`cur${i}`) || 'USD';
+        const isVirtual = loginid.startsWith('VRTC') || loginid.startsWith('VRT');
+        parsedAccounts.push({ loginid, token, currency, isVirtual });
+        i++;
       }
-      tableHtml += `</tr>`;
+
+      if (parsedAccounts.length > 0) {
+        this.accounts = parsedAccounts;
+        localStorage.setItem('deriv_accounts', JSON.stringify(this.accounts));
+        this.activeAccount = parsedAccounts[0];
+        localStorage.setItem('deriv_active_account', JSON.stringify(this.activeAccount));
+        // Clean URL query string
+        window.history.replaceState({}, document.title, window.location.pathname);
+        this.showToast(`Logged in successfully with ${parsedAccounts.length} Deriv account(s)!`, 'success');
+      }
     }
-    tableHtml += '</tbody>';
-    this.markovTable.innerHTML = tableHtml;
+  }
+
+  loadSavedAccounts() {
+    try {
+      const saved = localStorage.getItem('deriv_accounts');
+      if (saved) {
+        this.accounts = JSON.parse(saved);
+        const active = localStorage.getItem('deriv_active_account');
+        if (active) {
+          this.activeAccount = JSON.parse(active);
+        } else if (this.accounts.length > 0) {
+          this.activeAccount = this.accounts[0];
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load saved accounts:', e);
+    }
+  }
+
+  updateAccountUI() {
+    if (this.isAuthorized && this.activeAccount) {
+      this.accountPill.style.display = 'flex';
+      this.authActionsGroup.style.display = 'none';
+
+      const isReal = !this.activeAccount.isVirtual;
+      this.accountTypeTag.textContent = isReal ? 'REAL' : 'DEMO';
+      this.accountTypeTag.className = `account-type-tag ${isReal ? 'tag-real' : 'tag-demo'}`;
+
+      this.accountSelect.innerHTML = this.accounts.map(a => `
+        <option value="${a.loginid}" ${a.loginid === this.activeAccount.loginid ? 'selected' : ''}>
+          ${a.loginid} (${a.currency})
+        </option>
+      `).join('');
+
+      this.headerBalance.textContent = `$${this.liveBalance.toFixed(2)}`;
+    } else {
+      this.accountPill.style.display = 'none';
+      this.authActionsGroup.style.display = 'flex';
+    }
+  }
+
+  switchAccount(account) {
+    this.activeAccount = account;
+    localStorage.setItem('deriv_active_account', JSON.stringify(account));
+    this.showToast(`Switching to account ${account.loginid}...`, 'info');
+    if (this.ws && this.isConnected) {
+      this.ws.send(JSON.stringify({ authorize: account.token }));
+    }
+  }
+
+  logout() {
+    this.accounts = [];
+    this.activeAccount = null;
+    this.isAuthorized = false;
+    this.liveBalance = 0;
+    localStorage.removeItem('deriv_accounts');
+    localStorage.removeItem('deriv_active_account');
+    this.updateAccountUI();
+    this.showToast('Logged out of Deriv.', 'info');
+  }
+
+  openTokenModal() {
+    this.modalAppIdInput.value = this.appId;
+    this.tokenModal.style.display = 'flex';
+  }
+
+  closeTokenModal() {
+    this.tokenModal.style.display = 'none';
+  }
+
+  saveManualToken() {
+    const token = this.modalTokenInput.value.trim();
+    const customAppId = this.modalAppIdInput.value.trim();
+
+    if (customAppId && customAppId !== this.appId) {
+      this.appId = customAppId;
+      localStorage.setItem('deriv_app_id', customAppId);
+      this.wsUrl = `${DERIV_WS_BASE}?app_id=${this.appId}`;
+      this.connectWebSocket();
+    }
+
+    if (!token) {
+      alert('Please enter an API token.');
+      return;
+    }
+
+    this.showToast('Authorizing token with Deriv...', 'info');
+    if (this.ws && this.isConnected) {
+      this.ws.send(JSON.stringify({ authorize: token }));
+      this.pendingManualToken = token;
+    }
+    this.closeTokenModal();
   }
 
   /* ============================================================================
-   * DERIV WEBSOCKET CONNECTION & TICK STREAMING
+   * WEBSOCKET CONNECTION & TICK STREAM
    * ============================================================================ */
   connectWebSocket() {
     if (this.ws) {
       try { this.ws.close(); } catch (_) {}
     }
 
-    this.setConnectionStatus(false, 'Connecting to Deriv WS...');
-    this.ws = new WebSocket(DERIV_WS_URL);
+    this.setConnectionStatus(false, 'Connecting...');
+    this.ws = new WebSocket(this.wsUrl);
 
     this.ws.onopen = () => {
       this.isConnected = true;
-      this.setConnectionStatus(true, 'Connected (Live Stream)');
+      this.setConnectionStatus(true, 'Live Connected');
       this.subscribeToSymbol(this.currentSymbol);
+
+      // Auto-authorize if saved account exists
+      if (this.activeAccount && this.activeAccount.token) {
+        this.ws.send(JSON.stringify({ authorize: this.activeAccount.token }));
+      }
 
       if (this.pingInterval) clearInterval(this.pingInterval);
       this.pingInterval = setInterval(() => {
@@ -277,12 +413,14 @@ class DerivDigitBot {
 
     this.ws.onclose = () => {
       this.isConnected = false;
+      this.isAuthorized = false;
       this.setConnectionStatus(false, 'Reconnecting in 3s...');
+      this.updateAccountUI();
       setTimeout(() => this.connectWebSocket(), 3000);
     };
 
     this.ws.onerror = () => {
-      this.setConnectionStatus(false, 'WebSocket Error');
+      this.setConnectionStatus(false, 'Connection Error');
     };
   }
 
@@ -299,10 +437,7 @@ class DerivDigitBot {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
     this.ticks = [];
-    // Forget previous tick subscriptions first
     this.ws.send(JSON.stringify({ forget_all: 'ticks' }));
-
-    // Request last 1000 historical ticks + subscribe to live ticks
     this.ws.send(JSON.stringify({
       ticks_history: symbol,
       adjust_start_time: 1,
@@ -325,9 +460,12 @@ class DerivDigitBot {
 
   handleMessage(data) {
     if (data.error) {
-      console.warn('Deriv API Error:', data.error.message);
-      if (data.msg_type === 'authorize') {
-        alert('Deriv Token Authorization Failed: ' + data.error.message);
+      console.warn('Deriv API Error:', data.error);
+      this.showToast(`Deriv: ${data.error.message}`, 'error');
+
+      if (data.msg_type === 'buy') {
+        this.activeContract = null;
+        this.renderTradeTable();
       }
       return;
     }
@@ -384,24 +522,57 @@ class DerivDigitBot {
       this.evaluateAutoBot(tickObj);
     }
 
-    // 3. Live API Authorization Response
+    // 3. Authorization Success
     if (data.msg_type === 'authorize' && data.authorize) {
       this.isAuthorized = true;
-      this.liveBalance = Number(data.authorize.balance);
-      this.liveCurrency = data.authorize.currency || 'USD';
-      this.authorizeBtn.textContent = '✓ ' + data.authorize.loginid;
+      const auth = data.authorize;
+      this.liveBalance = Number(auth.balance);
+      this.liveCurrency = auth.currency || 'USD';
+
+      const isVirtual = Boolean(auth.is_virtual);
+      const loginid = auth.loginid;
+
+      // Update active account
+      this.activeAccount = {
+        loginid,
+        token: this.pendingManualToken || (this.activeAccount ? this.activeAccount.token : ''),
+        currency: this.liveCurrency,
+        isVirtual
+      };
+
+      if (!this.accounts.some(a => a.loginid === loginid)) {
+        this.accounts.push(this.activeAccount);
+      }
+      localStorage.setItem('deriv_accounts', JSON.stringify(this.accounts));
+      localStorage.setItem('deriv_active_account', JSON.stringify(this.activeAccount));
+      this.pendingManualToken = null;
+
+      this.showToast(`Authorized: ${loginid} ($${this.liveBalance.toFixed(2)})`, 'success');
+      this.updateAccountUI();
       this.updateBalanceDisplay();
+
+      // Subscribe to live balance updates
       this.ws.send(JSON.stringify({ balance: 1, subscribe: 1 }));
     }
 
+    // 4. Live Balance Updates
     if (data.msg_type === 'balance' && data.balance) {
       this.liveBalance = Number(data.balance.balance);
+      this.updateAccountUI();
       this.updateBalanceDisplay();
     }
 
-    // 4. Live API Buy & Contract Settlement
+    // 5. Live Buy Confirmation
     if (data.msg_type === 'buy' && data.buy) {
       const contractId = data.buy.contract_id;
+      if (this.activeContract) {
+        this.activeContract.contractId = contractId;
+        this.activeContract.status = 'OPEN';
+        this.renderTradeTable();
+      }
+      this.showToast(`Contract #${contractId} executed on Deriv!`, 'info');
+
+      // Subscribe to contract lifecycle
       this.ws.send(JSON.stringify({
         proposal_open_contract: 1,
         contract_id: contractId,
@@ -409,19 +580,22 @@ class DerivDigitBot {
       }));
     }
 
+    // 6. Live Contract Open Status & Settlement
     if (data.msg_type === 'proposal_open_contract' && data.proposal_open_contract) {
       const poc = data.proposal_open_contract;
       if (poc.is_sold && this.activeContract && this.activeContract.mode === 'LIVE') {
         const profit = Number(poc.profit);
-        const exitQuote = poc.exit_tick_display_value || '';
-        const exitDigit = exitQuote ? parseInt(exitQuote.charAt(exitQuote.length - 1), 10) : '-';
-        this.settleContract(profit > 0, profit, exitQuote, exitDigit);
+        const isWin = profit > 0;
+        const exitTickVal = poc.exit_tick_display_value || poc.exit_tick || '';
+        const exitDigit = exitTickVal ? parseInt(String(exitTickVal).slice(-1), 10) : '-';
+
+        this.settleContract(isWin, profit, String(exitTickVal), exitDigit);
       }
     }
   }
 
   /* ============================================================================
-   * STATISTICAL & PATTERN RECOGNITION ENGINE
+   * QUANTITATIVE STATISTICAL ENGINE
    * ============================================================================ */
   recalculateStats() {
     const sample = this.ticks.slice(-this.windowSize);
@@ -443,7 +617,7 @@ class DerivDigitBot {
     this.stats.evenPct = (evenCount / N) * 100;
     this.stats.oddPct = 100 - this.stats.evenPct;
 
-    // 2. Recurrence Drought (ticks since last seen)
+    // 2. Recurrence Drought
     const droughts = new Array(10).fill(N);
     for (let d = 0; d <= 9; d++) {
       for (let i = sample.length - 1; i >= 0; i--) {
@@ -455,7 +629,7 @@ class DerivDigitBot {
     }
     this.stats.droughts = droughts;
 
-    // 3. First-Order Markov Transition Matrix P(Next = j | Current = i)
+    // 3. First-Order Markov Transition Matrix
     const mCounts = Array.from({ length: 10 }, () => new Array(10).fill(0));
     const rowTotals = new Array(10).fill(0);
 
@@ -477,7 +651,7 @@ class DerivDigitBot {
     this.stats.markovCounts = mCounts;
     this.stats.markovProbs = mProbs;
 
-    // 4. Chi-Square Goodness-of-Fit & Shannon Entropy
+    // 4. Chi-Square & Shannon Entropy
     const expected = N / 10;
     let chiSq = 0;
     let entropy = 0;
@@ -492,7 +666,7 @@ class DerivDigitBot {
     this.stats.chiSquare = chiSq;
     this.stats.entropy = entropy;
 
-    // 5. Target Selection & Confidence Scoring
+    // 5. Target Selection & Signal Confidence
     const lastDigit = sample[sample.length - 1].digit;
     const prevDigit = sample.length >= 2 ? sample[sample.length - 2].digit : -1;
     const currentMarkovRow = mProbs[lastDigit];
@@ -546,15 +720,14 @@ class DerivDigitBot {
       return;
     }
 
-    // DIGITDIFF Target Selection
+    // Default: DIGITDIFF (Highest Win-Rate)
     this.stats.recommendedPrefix = 'DIFF';
     let bestDigit = 0;
-    let bestScore = Infinity; // Lower score = lower probability of occurring next = better DIFFER target
+    let bestScore = Infinity;
     let reason = '';
 
-    if (strategyMode === 'MARKOV_MIN' || strategyMode === 'MARKOV_ZERO') {
+    if (strategyMode === 'MARKOV_MIN') {
       for (let d = 0; d <= 9; d++) {
-        // Tie-breaker using overall frequency
         const score = currentMarkovRow[d] + (pcts[d] * 0.05);
         if (score < bestScore) {
           bestScore = score;
@@ -570,12 +743,12 @@ class DerivDigitBot {
           bestDigit = d;
         }
       }
-      reason = `Coldest Window Freq: ${bestScore.toFixed(1)}% (${counts[bestDigit]}/${N})`;
+      reason = `Coldest Freq: ${bestScore.toFixed(1)}% (${counts[bestDigit]}/${N})`;
     } else if (strategyMode === 'POST_CLUSTER') {
       if (lastDigit === prevDigit) {
         bestDigit = lastDigit;
         bestScore = currentMarkovRow[bestDigit];
-        reason = `2x Cluster Exhaustion on Digit ${bestDigit} (P=${bestScore.toFixed(1)}%)`;
+        reason = `2x Repeat Cluster Exhaustion on Digit ${bestDigit} (P=${bestScore.toFixed(1)}%)`;
       } else {
         for (let d = 0; d <= 9; d++) {
           const score = currentMarkovRow[d] * 0.65 + pcts[d] * 0.35;
@@ -587,8 +760,7 @@ class DerivDigitBot {
         reason = `Waiting for 2x Cluster (Standby Target: ${bestDigit})`;
       }
     } else {
-      // HYBRID ENSEMBLE (Default Recommended)
-      // Combines 62% Markov transition probability + 38% Rolling Frequency + Drought filter
+      // Hybrid Ensemble
       for (let d = 0; d <= 9; d++) {
         const markovP = currentMarkovRow[d];
         const freqP = pcts[d];
@@ -608,10 +780,7 @@ class DerivDigitBot {
 
     let conf = 50 + (differTheoreticalEdge - 88) * 5.2 + Math.min(8, this.stats.chiSquare * 0.35);
     if (strategyMode === 'POST_CLUSTER' && lastDigit !== prevDigit) {
-      conf = Math.min(conf, 64); // Suppress auto-entry until 2x cluster occurs
-    }
-    if (strategyMode === 'MARKOV_ZERO' && matchProb > 4.0) {
-      conf = Math.min(conf, 66); // Only fire when conditional transition probability is <= 4%
+      conf = Math.min(conf, 64);
     }
     conf = Math.max(50, Math.min(99.4, conf));
 
@@ -622,7 +791,7 @@ class DerivDigitBot {
   }
 
   /* ============================================================================
-   * RISK MANAGER, POSITION SIZING & TRADE EXECUTION
+   * RISK MANAGER, SIZING & EXECUTION
    * ============================================================================ */
   getCurrentStake() {
     const base = Math.max(0.35, parseFloat(this.baseStakeInput.value) || 10);
@@ -651,14 +820,15 @@ class DerivDigitBot {
   getPayoutRate() {
     const cType = this.contractTypeSelect.value;
     if (cType === 'DIGITDIFF' || cType === 'DIGITOVER_0' || cType === 'DIGITUNDER_9') {
-      return 0.096; // ~9.6% net payout on 90% win-rate contracts
+      return 0.096;
     }
-    return 0.235; // ~23.5% net payout on Digit Over 1 / Under 8
+    return 0.235;
   }
 
   startBot() {
     if (this.execMode === 'LIVE' && !this.isAuthorized) {
-      alert('Please enter your Deriv API Token and click "Auth" first, or switch to Paper Simulation Mode.');
+      this.showToast('Please log in with Deriv first or switch to Paper mode.', 'error');
+      this.openTokenModal();
       return;
     }
     this.botRunning = true;
@@ -669,6 +839,7 @@ class DerivDigitBot {
     this.botStateBadge.style.background = 'rgba(16, 185, 129, 0.2)';
     this.botStateBadge.style.color = 'var(--accent-emerald)';
     this.playTone(740, 100, 'sine');
+    this.showToast('Auto Bot Activated!', 'success');
   }
 
   stopBot(reason = 'STOPPED') {
@@ -683,29 +854,32 @@ class DerivDigitBot {
   evaluateAutoBot(latestTick) {
     if (!this.botRunning || this.activeContract) return;
 
-    // 1. Check Session Stop Loss / Take Profit / Circuit Breaker
+    // 1. Session Stop Loss / Take Profit / Circuit Breaker
     const tp = parseFloat(this.takeProfitInput.value) || 50;
     const sl = parseFloat(this.stopLossInput.value) || 50;
     const maxCL = parseInt(this.maxConsecLossesInput.value, 10) || 2;
 
     if (this.netPnl >= tp) {
       this.stopBot('TAKE PROFIT REACHED');
+      this.showToast('Session Take Profit Reached! Bot Paused.', 'success');
       return;
     }
     if (this.netPnl <= -sl) {
       this.stopBot('STOP LOSS HIT');
+      this.showToast('Session Stop Loss Hit! Bot Paused.', 'error');
       return;
     }
     if (this.consecLosses >= maxCL) {
       this.stopBot(`CIRCUIT BREAKER (${maxCL}L)`);
+      this.showToast(`Circuit Breaker: ${maxCL} consecutive losses. Bot Paused.`, 'error');
       return;
     }
 
-    // 2. Check Cooldown Ticks
+    // 2. Cooldown Ticks
     const cooldown = parseInt(this.cooldownTicksInput.value, 10) || 2;
     if (this.ticksSinceLastTrade < cooldown) return;
 
-    // 3. Check Minimum Confidence Threshold
+    // 3. Minimum Confidence Threshold
     const minConf = parseFloat(this.minConfidenceInput.value) || 76;
     if (this.stats.confidence >= minConf && this.ticks.length >= 50) {
       this.executeTrade('AUTO SIGNAL');
@@ -758,17 +932,22 @@ class DerivDigitBot {
       durationTicks: duration,
       remainingTicks: duration,
       mode: this.execMode,
-      triggerSource
+      triggerSource,
+      status: 'OPEN'
     };
 
     this.renderTradeTable();
+    this.playTone(520, 80, 'sine');
 
     if (this.execMode === 'LIVE') {
       if (!this.isAuthorized) {
         this.activeContract = null;
-        alert('Not authorized! Paste your Deriv API token first.');
+        this.showToast('Not authorized! Log in or enter API token first.', 'error');
+        this.openTokenModal();
         return;
       }
+
+      // Execute live contract on Deriv
       this.ws.send(JSON.stringify({
         buy: 1,
         price: stake,
@@ -841,6 +1020,7 @@ class DerivDigitBot {
       this.dalembertStep = Math.max(0, this.dalembertStep - 1);
       this.recoveryLossPool = Math.max(0, this.recoveryLossPool - profit);
       this.playTone(880, 85, 'sine');
+      this.showToast(`WON +$${profit.toFixed(2)} on ${settled.label} [Exit: ${exitDigit}]`, 'success');
     } else {
       this.losses++;
       this.consecLosses++;
@@ -848,6 +1028,7 @@ class DerivDigitBot {
       this.dalembertStep = Math.min(5, this.dalembertStep + 2);
       this.recoveryLossPool += Math.abs(profit);
       this.playTone(240, 180, 'triangle');
+      this.showToast(`LOST -$${Math.abs(profit).toFixed(2)} on ${settled.label} [Exit: ${exitDigit}]`, 'error');
     }
 
     this.tradeHistory.unshift(settled);
@@ -880,11 +1061,47 @@ class DerivDigitBot {
     this.updateNextStakePreview();
     this.renderTradeTable();
     this.drawEquityCurve();
+    this.showToast('Session stats reset.', 'info');
   }
 
   /* ============================================================================
-   * UI RENDERING & CANVAS CHARTING
+   * UI RENDERING & CHARTS
    * ============================================================================ */
+  renderInitialGrids() {
+    let html = '';
+    for (let d = 0; d <= 9; d++) {
+      html += `
+        <div class="digit-col" id="digitCol_${d}">
+          <div class="digit-tag" id="digitTag_${d}"></div>
+          <div class="bar-wrapper">
+            <div class="bar-baseline"></div>
+            <div class="bar-fill" id="digitBar_${d}" style="height: 50%;"></div>
+          </div>
+          <div class="digit-number">${d}</div>
+          <div class="digit-pct" id="digitPct_${d}">10.0%</div>
+          <div class="digit-drought" id="digitDrought_${d}">0t ago</div>
+        </div>
+      `;
+    }
+    this.digitDistributionGrid.innerHTML = html;
+
+    let tableHtml = '<thead><tr><th>Curr \\ Next</th>';
+    for (let c = 0; c <= 9; c++) {
+      tableHtml += `<th>→ ${c}</th>`;
+    }
+    tableHtml += '</tr></thead><tbody>';
+
+    for (let r = 0; r <= 9; r++) {
+      tableHtml += `<tr id="markovRow_${r}"><th>Digit ${r}</th>`;
+      for (let c = 0; c <= 9; c++) {
+        tableHtml += `<td id="markovCell_${r}_${c}">10.0%</td>`;
+      }
+      tableHtml += `</tr>`;
+    }
+    tableHtml += '</tbody>';
+    this.markovTable.innerHTML = tableHtml;
+  }
+
   updateUI() {
     const N = Math.min(this.ticks.length, this.windowSize);
     if (N === 0) return;
@@ -894,7 +1111,6 @@ class DerivDigitBot {
     this.liveDigitBadge.textContent = latest.digit;
     this.tickCountSub.textContent = `Window: ${N} / ${this.windowSize} ticks`;
 
-    // Hero Signal & Confidence
     const recDigit = this.stats.recommendedDigit;
     const recPrefix = this.stats.recommendedPrefix || 'DIFF';
     this.bestTargetPrefix.textContent = recPrefix;
@@ -907,13 +1123,12 @@ class DerivDigitBot {
 
     this.chiSquareSub.textContent = `χ²: ${this.stats.chiSquare.toFixed(1)} | Entropy: ${this.stats.entropy.toFixed(2)}b`;
 
-    // Banner Signal
     this.bannerContractPrefix.textContent = recPrefix;
     this.bannerTargetDigit.textContent = recDigit;
     this.bannerSignalTitle.textContent = this.stats.recommendedReason;
     const matchP = this.stats.markovMinProb;
     this.bannerSignalSub.textContent =
-      `Conditional P(Lose): ${matchP.toFixed(1)}% | Conditional Win Expectancy: ${(100 - matchP).toFixed(1)}%`;
+      `Conditional P(Lose): ${matchP.toFixed(1)}% | Win Expectancy: ${(100 - matchP).toFixed(1)}%`;
 
     this.updateNextStakePreview();
     this.updateBalanceDisplay();
@@ -932,7 +1147,7 @@ class DerivDigitBot {
     this.evenOddRatioBadge.textContent =
       `Even: ${this.stats.evenPct.toFixed(1)}% | Odd: ${this.stats.oddPct.toFixed(1)}%`;
 
-    // Update 0-9 Distribution Bars
+    // 0-9 Distribution Bars
     const maxPct = Math.max(20, ...this.stats.freqPcts);
     const minFreq = Math.min(...this.stats.freqPcts);
     const maxFreq = Math.max(...this.stats.freqPcts);
@@ -971,7 +1186,7 @@ class DerivDigitBot {
       droughtEl.textContent = drought === 0 ? 'NOW' : `${drought}t ago`;
     }
 
-    // Update 10x10 Markov Matrix Heatmap
+    // 10x10 Markov Matrix Heatmap
     this.activeMarkovRowBadge.textContent = `Active Row: Digit ${latest.digit}`;
     for (let r = 0; r <= 9; r++) {
       const rowEl = document.getElementById(`markovRow_${r}`);
@@ -1064,7 +1279,7 @@ class DerivDigitBot {
       this.tradeTableBody.innerHTML = `
         <tr>
           <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">
-            No trades executed yet. Start Auto Bot or click "Snipe 1 Trade Now" to test against live Deriv ticks.
+            No trades executed yet. Click "Snipe 1 Trade Now" or start Auto Bot.
           </td>
         </tr>
       `;
@@ -1105,7 +1320,6 @@ class DerivDigitBot {
     const getY = (val) => h - pad - ((val - minVal) / range) * (h - pad * 2);
     const getX = (idx) => pad + (idx / (data.length - 1)) * (w - pad * 2);
 
-    // Zero baseline
     const zeroY = getY(0);
     ctx.strokeStyle = 'rgba(148, 163, 184, 0.25)';
     ctx.setLineDash([3, 3]);
@@ -1115,7 +1329,6 @@ class DerivDigitBot {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Equity Line
     const isPositive = data[data.length - 1] >= 0;
     const strokeColor = isPositive ? '#10b981' : '#f43f5e';
 
