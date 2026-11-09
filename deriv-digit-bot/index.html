@@ -18,14 +18,14 @@
       <div>
         <div class="brand-title">
           <span>DERIV QUANT // DIGIT DIFFERS TERMINAL</span>
-          <span class="live-pill" id="marketStatusPill">LIVE DATA ACTIVE</span>
+          <span class="live-pill" id="marketStatusPill">LIVE STREAM ACTIVE</span>
         </div>
-        <div class="brand-subtitle">Real WebSocket Feed • Markov Transitions • Auto-Execution Engine</div>
+        <div class="brand-subtitle">Real Deriv WebSocket Feed • Markov Transitions • Auto-Execution Engine</div>
       </div>
     </div>
 
     <div class="nav-controls">
-      <!-- Deriv Symbol Selector -->
+      <!-- Market Selector -->
       <div class="control-pill">
         <label for="symbolSelect">Market</label>
         <select id="symbolSelect">
@@ -43,49 +43,71 @@
         </select>
       </div>
 
-      <!-- Execution Mode: Paper vs Live Account -->
+      <!-- Execution Mode: Paper vs Real Account -->
       <div class="control-pill">
         <label for="execModeSelect">Mode</label>
         <select id="execModeSelect">
-          <option value="PAPER" selected>Paper Simulation (Live Ticks)</option>
-          <option value="LIVE">Real Deriv Account (Live Bets)</option>
+          <option value="PAPER" selected>Paper Simulation (Safe)</option>
+          <option value="LIVE">Real Deriv Account (Live Money)</option>
         </select>
       </div>
 
       <!-- Logged-in Account Badge & Switcher (Shown when authorized) -->
       <div id="accountPill" class="account-badge-pill" style="display: none;">
         <span id="accountTypeTag" class="account-type-tag tag-demo">DEMO</span>
-        <select id="accountSelect" style="background: transparent; border: none; font-weight: 700; color: #fff; padding: 0 4px; font-family: var(--font-mono);"></select>
+        <select id="accountSelect" style="background: transparent; border: none; font-weight: 700; color: #fff; padding: 0 4px; font-family: var(--font-mono); cursor: pointer;"></select>
         <span id="headerBalance" class="account-balance-text">$0.00</span>
-        <button id="logoutBtn" title="Log out" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; margin-left: 4px;">✕</button>
+        <button id="logoutBtn" title="Log out of Deriv" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; margin-left: 6px;">✕</button>
       </div>
 
-      <!-- Auth Actions: OAuth Login & API Token Modal -->
+      <!-- Quick Auth Actions -->
       <div id="authActionsGroup" style="display: flex; gap: 8px; align-items: center;">
-        <button class="btn-deriv-login" id="derivOAuthBtn" title="Official Deriv OAuth2 Redirect Login">
+        <button class="btn-deriv-login" id="derivOAuthBtn" title="Log in via official Deriv login page">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14h2v2h-2v-2zm0-10h2v8h-2V6z"/>
           </svg>
-          Log in with Deriv
+          Deriv OAuth
         </button>
         <button class="btn btn-secondary" id="openTokenModalBtn" style="padding: 7px 11px; min-width: auto; font-size: 11px;">
-          API Token
+          🔑 Enter API Token
         </button>
       </div>
 
-      <!-- Sound Toggle -->
+      <!-- Audio FX Toggle -->
       <div class="control-pill" title="Toggle audio sound FX for wins, losses and entries">
         <label for="soundToggle">Audio</label>
         <input type="checkbox" id="soundToggle" checked style="cursor: pointer;" />
       </div>
 
-      <!-- WebSocket Stream Status Badge -->
+      <!-- WebSocket Stream Status -->
       <div id="wsStatusBadge" class="status-badge disconnected">
         <span class="status-dot"></span>
         <span id="wsStatusText">Connecting...</span>
       </div>
     </div>
   </header>
+
+  <!-- High-Visibility Deriv Account Connection Bar -->
+  <div class="login-banner" id="loginBanner">
+    <div class="login-banner-content">
+      <div class="login-banner-title">
+        <span class="login-banner-icon">⚡</span>
+        <div>
+          <strong>Connect Your Real Deriv Account:</strong>
+          <span style="color: var(--text-secondary); margin-left: 6px;">Paste your Deriv API Token below to trade with real funds or demo balance.</span>
+        </div>
+      </div>
+      <div class="login-banner-form">
+        <input type="password" id="bannerTokenInput" placeholder="Paste your Deriv API Token (Read + Trade)..." style="width: 280px;" />
+        <button class="btn btn-start" id="bannerConnectBtn" style="min-width: auto; padding: 7px 16px;">
+          Connect &amp; Start
+        </button>
+        <a href="https://app.deriv.com/account/api-token" target="_blank" rel="noopener" class="btn btn-secondary" style="min-width: auto; padding: 7px 12px; font-size: 11px; text-decoration: none;">
+          Get Token ↗
+        </a>
+      </div>
+    </div>
+  </div>
 
   <!-- Live Hero Metrics Strip -->
   <section class="ticker-strip">
@@ -155,9 +177,7 @@
           <span class="card-badge">Dashed Line = 10.0% Expected Baseline</span>
         </div>
         <div class="card-body">
-          <div class="digit-grid" id="digitDistributionGrid">
-            <!-- Populated dynamically by JS -->
-          </div>
+          <div class="digit-grid" id="digitDistributionGrid"></div>
         </div>
       </div>
 
@@ -170,9 +190,7 @@
           <span class="card-badge" id="activeMarkovRowBadge">Active Row: -</span>
         </div>
         <div class="card-body markov-container">
-          <table class="markov-table" id="markovTable">
-            <!-- Populated dynamically by JS -->
-          </table>
+          <table class="markov-table" id="markovTable"></table>
         </div>
       </div>
 
@@ -199,7 +217,7 @@
                 <strong id="bannerTargetDigit">-</strong>
               </div>
               <div>
-                <div style="font-weight: 700; font-size: 14px;" id="bannerSignalTitle">Waiting for Tick History...</div>
+                <div style="font-weight: 700; font-size: 14px;" id="bannerSignalTitle">Waiting for Tick Stream...</div>
                 <div style="font-size: 11px; color: var(--text-secondary);" id="bannerSignalSub">
                   Conditional Loss Prob: --% | Win Expectancy: --%
                 </div>
@@ -338,7 +356,7 @@
         <button class="modal-close" id="closeTokenModalBtn">×</button>
       </div>
       <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 14px;">
-        To trade with real funds or demo balance on Deriv, paste your API token below.
+        To trade with real money or demo funds on Deriv, paste your API token below.
         Tokens can be created in your Deriv settings with <strong>Read</strong> and <strong>Trade</strong> scopes.
       </p>
 
@@ -348,7 +366,7 @@
       </div>
 
       <div class="form-group" style="margin-bottom: 16px;">
-        <label for="modalAppIdInput">Deriv App ID (Optional, defaults to 1089)</label>
+        <label for="modalAppIdInput">Deriv App ID (Optional, default 1089)</label>
         <input type="number" id="modalAppIdInput" value="1089" />
       </div>
 
