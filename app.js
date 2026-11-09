@@ -1,22 +1,18 @@
 /**
- * DERIV QUANT — Digit Statistics & Real-Time Trading Terminal
- * Official Deriv WebSocket v3 API Integration
- * Supports:
- * - Official Deriv OAuth2 Login (Multi-Account Switcher: Real CR vs Demo VRTC)
- * - Direct API Token Authentication (with localStorage persistence)
- * - 1,000 Historical Ticks Preload + Live Tick Stream across all Synthetic Indices
- * - 1st-Order Markov Chain Transition Matrix + Drought & Frequency Ensemble
- * - Automated Capped D'Alembert & Split Recovery Money Management
- * - Live Proposal & Buy Execution with real contract tracking
+ * DERIV QUANT — Real-Time Quantitative Trading Terminal
+ * High-Reliability Deriv WebSocket Integration
  */
 
-const DEFAULT_DERIV_APP_ID = '1089';
-const DERIV_WS_BASE = 'wss://ws.derivws.com/websockets/v3';
+const DERIV_APP_ID = '1089';
+const WS_SERVERS = [
+  'wss://ws.derivws.com/websockets/v3',
+  'wss://ws.binaryws.com/websockets/v3'
+];
 
 class DerivDigitBot {
   constructor() {
-    this.appId = localStorage.getItem('deriv_app_id') || DEFAULT_DERIV_APP_ID;
-    this.wsUrl = `${DERIV_WS_BASE}?app_id=${this.appId}`;
+    this.appId = localStorage.getItem('deriv_app_id') || DERIV_APP_ID;
+    this.serverIndex = 0;
 
     // WebSocket state
     this.ws = null;
@@ -27,18 +23,18 @@ class DerivDigitBot {
     this.currentSymbol = '1HZ100V';
     this.windowSize = 500;
 
-    // Accounts State (OAuth & Manual Tokens)
+    // Accounts State
     this.accounts = []; // [{ loginid, token, currency, isVirtual }]
     this.activeAccount = null;
 
-    // Web Audio FX
+    // Audio FX
     this.audioCtx = null;
 
-    // Tick & Digit Ring Buffer (up to 1,000 ticks)
-    this.ticks = []; // { epoch, quote, quoteStr, digit }
+    // Tick Ring Buffer (up to 1,000 ticks)
+    this.ticks = [];
     this.maxBuffer = 1000;
 
-    // Quantitative Statistics State
+    // Quantitative Analytics
     this.stats = {
       freqCounts: new Array(10).fill(0),
       freqPcts: new Array(10).fill(10),
@@ -51,12 +47,12 @@ class DerivDigitBot {
       oddPct: 50,
       recommendedPrefix: 'DIFF',
       recommendedDigit: 0,
-      recommendedReason: 'Initializing...',
+      recommendedReason: 'Calculating...',
       confidence: 0,
       markovMinProb: 10
     };
 
-    // Bot & Risk Management State
+    // Bot & Risk State
     this.botRunning = false;
     this.execMode = 'PAPER'; // 'PAPER' | 'LIVE'
     this.paperBalance = 1000.0;
@@ -74,7 +70,6 @@ class DerivDigitBot {
     this.recoveryLossPool = 0;
     this.ticksSinceLastTrade = 999;
 
-    // Active Contract
     this.activeContract = null;
     this.tradeHistory = [];
 
@@ -87,10 +82,9 @@ class DerivDigitBot {
   }
 
   /* ============================================================================
-   * INITIALIZATION & DOM BINDING
+   * DOM BINDING & EVENTS
    * ============================================================================ */
   initDOM() {
-    // Header & Auth
     this.symbolSelect = document.getElementById('symbolSelect');
     this.execModeSelect = document.getElementById('execModeSelect');
     this.accountPill = document.getElementById('accountPill');
@@ -106,7 +100,12 @@ class DerivDigitBot {
     this.wsStatusText = document.getElementById('wsStatusText');
     this.marketStatusPill = document.getElementById('marketStatusPill');
 
-    // Hero Metrics
+    // Login Banner
+    this.loginBanner = document.getElementById('loginBanner');
+    this.bannerTokenInput = document.getElementById('bannerTokenInput');
+    this.bannerConnectBtn = document.getElementById('bannerConnectBtn');
+
+    // Hero
     this.livePriceDisplay = document.getElementById('livePriceDisplay');
     this.liveDigitBadge = document.getElementById('liveDigitBadge');
     this.tickCountSub = document.getElementById('tickCountSub');
@@ -120,14 +119,14 @@ class DerivDigitBot {
     this.balanceDisplay = document.getElementById('balanceDisplay');
     this.netPnlDisplay = document.getElementById('netPnlDisplay');
 
-    // Left Column Analytics
+    // Visualizers
     this.tickTape = document.getElementById('tickTape');
     this.evenOddRatioBadge = document.getElementById('evenOddRatioBadge');
     this.digitDistributionGrid = document.getElementById('digitDistributionGrid');
     this.markovTable = document.getElementById('markovTable');
     this.activeMarkovRowBadge = document.getElementById('activeMarkovRowBadge');
 
-    // Right Column Strategy & Bot
+    // Controls
     this.botStateBadge = document.getElementById('botStateBadge');
     this.bannerContractPrefix = document.getElementById('bannerContractPrefix');
     this.bannerTargetDigit = document.getElementById('bannerTargetDigit');
@@ -163,7 +162,7 @@ class DerivDigitBot {
     this.saveTokenBtn = document.getElementById('saveTokenBtn');
     this.toastContainer = document.getElementById('toastContainer');
 
-    // Listeners
+    // Event listeners
     this.symbolSelect.addEventListener('change', (e) => {
       this.currentSymbol = e.target.value;
       this.subscribeToSymbol(this.currentSymbol);
@@ -172,24 +171,41 @@ class DerivDigitBot {
     this.execModeSelect.addEventListener('change', (e) => {
       this.execMode = e.target.value;
       if (this.execMode === 'LIVE' && !this.isAuthorized) {
-        this.showToast('Please log in with Deriv or enter an API token to trade in Live mode.', 'error');
-        this.openTokenModal();
+        this.showToast('To trade in Real Mode, please enter your Deriv token.', 'info');
+        if (this.loginBanner) this.loginBanner.scrollIntoView({ behavior: 'smooth' });
       }
       this.updateBalanceDisplay();
+    });
+
+    this.bannerConnectBtn.addEventListener('click', () => {
+      const token = this.bannerTokenInput.value.trim();
+      if (token) this.authorizeToken(token);
+    });
+
+    this.bannerTokenInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const token = this.bannerTokenInput.value.trim();
+        if (token) this.authorizeToken(token);
+      }
     });
 
     this.derivOAuthBtn.addEventListener('click', () => this.startOAuthLogin());
     this.openTokenModalBtn.addEventListener('click', () => this.openTokenModal());
     this.closeTokenModalBtn.addEventListener('click', () => this.closeTokenModal());
-    this.saveTokenBtn.addEventListener('click', () => this.saveManualToken());
+    this.saveTokenBtn.addEventListener('click', () => {
+      const token = this.modalTokenInput.value.trim();
+      if (token) {
+        this.authorizeToken(token);
+        this.closeTokenModal();
+      }
+    });
+
     this.logoutBtn.addEventListener('click', () => this.logout());
 
     this.accountSelect.addEventListener('change', (e) => {
       const selectedId = e.target.value;
       const acct = this.accounts.find(a => a.loginid === selectedId);
-      if (acct) {
-        this.switchAccount(acct);
-      }
+      if (acct) this.switchAccount(acct);
     });
 
     this.contractTypeSelect.addEventListener('change', () => {
@@ -248,10 +264,11 @@ class DerivDigitBot {
   }
 
   /* ============================================================================
-   * DERIV OAUTH2 & TOKEN AUTHENTICATION
+   * AUTHENTICATION & MULTI-ACCOUNT MANAGEMENT
    * ============================================================================ */
   startOAuthLogin() {
-    const oauthUrl = `https://oauth.deriv.com/oauth2/authorize?app_id=${this.appId}&l=en&brand=deriv`;
+    const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
+    const oauthUrl = `https://oauth.deriv.com/oauth2/authorize?app_id=${this.appId}&l=en&brand=deriv&redirect_uri=${redirectUri}`;
     window.location.href = oauthUrl;
   }
 
@@ -274,9 +291,8 @@ class DerivDigitBot {
         localStorage.setItem('deriv_accounts', JSON.stringify(this.accounts));
         this.activeAccount = parsedAccounts[0];
         localStorage.setItem('deriv_active_account', JSON.stringify(this.activeAccount));
-        // Clean URL query string
         window.history.replaceState({}, document.title, window.location.pathname);
-        this.showToast(`Logged in successfully with ${parsedAccounts.length} Deriv account(s)!`, 'success');
+        this.showToast(`Logged in with ${parsedAccounts.length} Deriv account(s)!`, 'success');
       }
     }
   }
@@ -298,10 +314,20 @@ class DerivDigitBot {
     }
   }
 
+  authorizeToken(token) {
+    if (!token) return;
+    this.pendingToken = token;
+    this.showToast('Authorizing with Deriv API...', 'info');
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ authorize: token }));
+    }
+  }
+
   updateAccountUI() {
     if (this.isAuthorized && this.activeAccount) {
       this.accountPill.style.display = 'flex';
       this.authActionsGroup.style.display = 'none';
+      if (this.loginBanner) this.loginBanner.style.display = 'none';
 
       const isReal = !this.activeAccount.isVirtual;
       this.accountTypeTag.textContent = isReal ? 'REAL' : 'DEMO';
@@ -317,13 +343,14 @@ class DerivDigitBot {
     } else {
       this.accountPill.style.display = 'none';
       this.authActionsGroup.style.display = 'flex';
+      if (this.loginBanner) this.loginBanner.style.display = 'block';
     }
   }
 
   switchAccount(account) {
     this.activeAccount = account;
     localStorage.setItem('deriv_active_account', JSON.stringify(account));
-    this.showToast(`Switching to account ${account.loginid}...`, 'info');
+    this.showToast(`Switching to ${account.loginid}...`, 'info');
     if (this.ws && this.isConnected) {
       this.ws.send(JSON.stringify({ authorize: account.token }));
     }
@@ -349,51 +376,36 @@ class DerivDigitBot {
     this.tokenModal.style.display = 'none';
   }
 
-  saveManualToken() {
-    const token = this.modalTokenInput.value.trim();
-    const customAppId = this.modalAppIdInput.value.trim();
-
-    if (customAppId && customAppId !== this.appId) {
-      this.appId = customAppId;
-      localStorage.setItem('deriv_app_id', customAppId);
-      this.wsUrl = `${DERIV_WS_BASE}?app_id=${this.appId}`;
-      this.connectWebSocket();
-    }
-
-    if (!token) {
-      alert('Please enter an API token.');
-      return;
-    }
-
-    this.showToast('Authorizing token with Deriv...', 'info');
-    if (this.ws && this.isConnected) {
-      this.ws.send(JSON.stringify({ authorize: token }));
-      this.pendingManualToken = token;
-    }
-    this.closeTokenModal();
-  }
-
   /* ============================================================================
-   * WEBSOCKET CONNECTION & TICK STREAM
+   * WEBSOCKET CONNECTION & LIVE TICK STREAM
    * ============================================================================ */
   connectWebSocket() {
     if (this.ws) {
       try { this.ws.close(); } catch (_) {}
     }
 
+    const currentBase = WS_SERVERS[this.serverIndex % WS_SERVERS.length];
+    const wsUrl = `${currentBase}?app_id=${this.appId}`;
+
     this.setConnectionStatus(false, 'Connecting...');
-    this.ws = new WebSocket(this.wsUrl);
+    this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
       this.isConnected = true;
       this.setConnectionStatus(true, 'Live Connected');
+      this.marketStatusPill.textContent = 'LIVE STREAM ACTIVE';
+
+      // Subscribe to symbol ticks
       this.subscribeToSymbol(this.currentSymbol);
 
       // Auto-authorize if saved account exists
       if (this.activeAccount && this.activeAccount.token) {
         this.ws.send(JSON.stringify({ authorize: this.activeAccount.token }));
+      } else if (this.pendingToken) {
+        this.ws.send(JSON.stringify({ authorize: this.pendingToken }));
       }
 
+      // Keepalive ping every 25 seconds
       if (this.pingInterval) clearInterval(this.pingInterval);
       this.pingInterval = setInterval(() => {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -414,13 +426,17 @@ class DerivDigitBot {
     this.ws.onclose = () => {
       this.isConnected = false;
       this.isAuthorized = false;
-      this.setConnectionStatus(false, 'Reconnecting in 3s...');
+      this.setConnectionStatus(false, 'Reconnecting in 2s...');
+      this.marketStatusPill.textContent = 'RECONNECTING...';
       this.updateAccountUI();
-      setTimeout(() => this.connectWebSocket(), 3000);
+
+      // Cycle to backup server if connection fails
+      this.serverIndex++;
+      setTimeout(() => this.connectWebSocket(), 2000);
     };
 
     this.ws.onerror = () => {
-      this.setConnectionStatus(false, 'Connection Error');
+      this.setConnectionStatus(false, 'Network Error');
     };
   }
 
@@ -438,13 +454,20 @@ class DerivDigitBot {
 
     this.ticks = [];
     this.ws.send(JSON.stringify({ forget_all: 'ticks' }));
+
+    // 1. Fetch 1,000 tick historical buffer
     this.ws.send(JSON.stringify({
       ticks_history: symbol,
       adjust_start_time: 1,
       count: 1000,
       end: 'latest',
       start: 1,
-      style: 'ticks',
+      style: 'ticks'
+    }));
+
+    // 2. Explicit continuous live tick subscription
+    this.ws.send(JSON.stringify({
+      ticks: symbol,
       subscribe: 1
     }));
   }
@@ -460,7 +483,7 @@ class DerivDigitBot {
 
   handleMessage(data) {
     if (data.error) {
-      console.warn('Deriv API Error:', data.error);
+      console.warn('Deriv Error:', data.error);
       this.showToast(`Deriv: ${data.error.message}`, 'error');
 
       if (data.msg_type === 'buy') {
@@ -470,7 +493,7 @@ class DerivDigitBot {
       return;
     }
 
-    // 1. Historical Ticks Preload
+    // 1. Historical Ticks Response
     if (data.msg_type === 'history' && data.history) {
       if (typeof data.pip_size === 'number') {
         this.pipSize = data.pip_size;
@@ -497,7 +520,7 @@ class DerivDigitBot {
       this.updateUI();
     }
 
-    // 2. Live Incoming Tick
+    // 2. Live Incoming Real-Time Tick
     if (data.msg_type === 'tick' && data.tick) {
       if (typeof data.tick.pip_size === 'number') {
         this.pipSize = data.tick.pip_size;
@@ -531,11 +554,11 @@ class DerivDigitBot {
 
       const isVirtual = Boolean(auth.is_virtual);
       const loginid = auth.loginid;
+      const token = this.pendingToken || (this.activeAccount ? this.activeAccount.token : '');
 
-      // Update active account
       this.activeAccount = {
         loginid,
-        token: this.pendingManualToken || (this.activeAccount ? this.activeAccount.token : ''),
+        token,
         currency: this.liveCurrency,
         isVirtual
       };
@@ -545,13 +568,16 @@ class DerivDigitBot {
       }
       localStorage.setItem('deriv_accounts', JSON.stringify(this.accounts));
       localStorage.setItem('deriv_active_account', JSON.stringify(this.activeAccount));
-      this.pendingManualToken = null;
+      this.pendingToken = null;
 
-      this.showToast(`Authorized: ${loginid} ($${this.liveBalance.toFixed(2)})`, 'success');
+      this.execMode = 'LIVE';
+      this.execModeSelect.value = 'LIVE';
+
+      this.showToast(`Connected to Deriv: ${loginid} ($${this.liveBalance.toFixed(2)})`, 'success');
       this.updateAccountUI();
       this.updateBalanceDisplay();
 
-      // Subscribe to live balance updates
+      // Subscribe to balance
       this.ws.send(JSON.stringify({ balance: 1, subscribe: 1 }));
     }
 
@@ -570,9 +596,9 @@ class DerivDigitBot {
         this.activeContract.status = 'OPEN';
         this.renderTradeTable();
       }
-      this.showToast(`Contract #${contractId} executed on Deriv!`, 'info');
+      this.showToast(`Contract #${contractId} bought on Deriv!`, 'info');
 
-      // Subscribe to contract lifecycle
+      // Subscribe to contract
       this.ws.send(JSON.stringify({
         proposal_open_contract: 1,
         contract_id: contractId,
@@ -720,7 +746,7 @@ class DerivDigitBot {
       return;
     }
 
-    // Default: DIGITDIFF (Highest Win-Rate)
+    // DIGITDIFF (Default ~90% Win Rate)
     this.stats.recommendedPrefix = 'DIFF';
     let bestDigit = 0;
     let bestScore = Infinity;
@@ -791,7 +817,7 @@ class DerivDigitBot {
   }
 
   /* ============================================================================
-   * RISK MANAGER, SIZING & EXECUTION
+   * RISK MANAGER & EXECUTION ROUTER
    * ============================================================================ */
   getCurrentStake() {
     const base = Math.max(0.35, parseFloat(this.baseStakeInput.value) || 10);
@@ -827,8 +853,8 @@ class DerivDigitBot {
 
   startBot() {
     if (this.execMode === 'LIVE' && !this.isAuthorized) {
-      this.showToast('Please log in with Deriv first or switch to Paper mode.', 'error');
-      this.openTokenModal();
+      this.showToast('Please enter your Deriv token to trade with real funds.', 'error');
+      if (this.loginBanner) this.loginBanner.scrollIntoView({ behavior: 'smooth' });
       return;
     }
     this.botRunning = true;
@@ -942,12 +968,11 @@ class DerivDigitBot {
     if (this.execMode === 'LIVE') {
       if (!this.isAuthorized) {
         this.activeContract = null;
-        this.showToast('Not authorized! Log in or enter API token first.', 'error');
-        this.openTokenModal();
+        this.showToast('Please enter your Deriv token to execute real bets.', 'error');
+        if (this.loginBanner) this.loginBanner.scrollIntoView({ behavior: 'smooth' });
         return;
       }
 
-      // Execute live contract on Deriv
       this.ws.send(JSON.stringify({
         buy: 1,
         price: stake,
@@ -1345,6 +1370,15 @@ class DerivDigitBot {
   }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  window.derivBot = new DerivDigitBot();
-});
+// Self-executing initialization guaranteed across all browser states
+function initTerminal() {
+  if (!window.derivBot) {
+    window.derivBot = new DerivDigitBot();
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initTerminal);
+} else {
+  initTerminal();
+}
