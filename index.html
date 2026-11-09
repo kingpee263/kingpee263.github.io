@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Deriv Quant — Digit Statistics & Pattern Recognition Terminal</title>
+  <title>Deriv Quant — Digit Statistics &amp; Real-Time Trading Terminal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -14,16 +14,20 @@
   <!-- Top Navigation & Connection Bar -->
   <header class="top-nav">
     <div class="brand">
-      <div class="brand-logo">DQ</div>
+      <div class="brand-logo">D</div>
       <div>
-        <div class="brand-title">DERIV QUANT // DIGIT DIFFERS &amp; PATTERN ENGINE</div>
-        <div class="brand-subtitle">Markov Chain, Frequency Skew &amp; Recurrence Drought Terminal (~90% Win-Rate Architecture)</div>
+        <div class="brand-title">
+          <span>DERIV QUANT // DIGIT DIFFERS TERMINAL</span>
+          <span class="live-pill" id="marketStatusPill">LIVE DATA ACTIVE</span>
+        </div>
+        <div class="brand-subtitle">Real WebSocket Feed • Markov Transitions • Auto-Execution Engine</div>
       </div>
     </div>
 
     <div class="nav-controls">
+      <!-- Deriv Symbol Selector -->
       <div class="control-pill">
-        <label for="symbolSelect">Synthetic Index</label>
+        <label for="symbolSelect">Market</label>
         <select id="symbolSelect">
           <option value="1HZ100V" selected>Volatility 100 (1s) [1HZ100V]</option>
           <option value="R_100">Volatility 100 [R_100]</option>
@@ -39,35 +43,43 @@
         </select>
       </div>
 
+      <!-- Execution Mode: Paper vs Live Account -->
       <div class="control-pill">
-        <label for="windowSelect">Sample Window</label>
-        <select id="windowSelect">
-          <option value="100">Last 100 Ticks</option>
-          <option value="250">Last 250 Ticks</option>
-          <option value="500" selected>Last 500 Ticks</option>
-          <option value="1000">Last 1,000 Ticks</option>
-        </select>
-      </div>
-
-      <div class="control-pill">
-        <label for="execModeSelect">Execution Mode</label>
+        <label for="execModeSelect">Mode</label>
         <select id="execModeSelect">
           <option value="PAPER" selected>Paper Simulation (Live Ticks)</option>
-          <option value="LIVE">Deriv API Account (Token)</option>
+          <option value="LIVE">Real Deriv Account (Live Bets)</option>
         </select>
       </div>
 
-      <div class="control-pill" id="apiTokenContainer" style="display: none;">
-        <label for="apiTokenInput">API Token</label>
-        <input type="password" id="apiTokenInput" placeholder="Paste Deriv Token..." style="width: 145px;" />
-        <button class="btn btn-secondary" id="authorizeBtn" style="min-width: auto; padding: 5px 10px;">Auth</button>
+      <!-- Logged-in Account Badge & Switcher (Shown when authorized) -->
+      <div id="accountPill" class="account-badge-pill" style="display: none;">
+        <span id="accountTypeTag" class="account-type-tag tag-demo">DEMO</span>
+        <select id="accountSelect" style="background: transparent; border: none; font-weight: 700; color: #fff; padding: 0 4px; font-family: var(--font-mono);"></select>
+        <span id="headerBalance" class="account-balance-text">$0.00</span>
+        <button id="logoutBtn" title="Log out" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; margin-left: 4px;">✕</button>
       </div>
 
-      <div class="control-pill">
-        <label for="soundToggle">Audio FX</label>
+      <!-- Auth Actions: OAuth Login & API Token Modal -->
+      <div id="authActionsGroup" style="display: flex; gap: 8px; align-items: center;">
+        <button class="btn-deriv-login" id="derivOAuthBtn" title="Official Deriv OAuth2 Redirect Login">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14h2v2h-2v-2zm0-10h2v8h-2V6z"/>
+          </svg>
+          Log in with Deriv
+        </button>
+        <button class="btn btn-secondary" id="openTokenModalBtn" style="padding: 7px 11px; min-width: auto; font-size: 11px;">
+          API Token
+        </button>
+      </div>
+
+      <!-- Sound Toggle -->
+      <div class="control-pill" title="Toggle audio sound FX for wins, losses and entries">
+        <label for="soundToggle">Audio</label>
         <input type="checkbox" id="soundToggle" checked style="cursor: pointer;" />
       </div>
 
+      <!-- WebSocket Stream Status Badge -->
       <div id="wsStatusBadge" class="status-badge disconnected">
         <span class="status-dot"></span>
         <span id="wsStatusText">Connecting...</span>
@@ -87,7 +99,7 @@
     </div>
 
     <div class="metric-box">
-      <div class="metric-label">Optimal High-Probability Target</div>
+      <div class="metric-label">Highest Win-Rate Target</div>
       <div class="metric-value" style="color: var(--accent-emerald);">
         <span id="bestTargetPrefix">DIFF</span> <span id="bestTargetDigit" style="font-size: 24px;">-</span>
       </div>
@@ -95,9 +107,9 @@
     </div>
 
     <div class="metric-box">
-      <div class="metric-label">Signal Confidence &amp; Regime</div>
+      <div class="metric-label">Signal Confidence &amp; Edge</div>
       <div class="metric-value" id="confidenceDisplay">0.0%</div>
-      <div class="metric-sub" id="chiSquareSub">Chi-Sq (χ²): -- | Entropy: --</div>
+      <div class="metric-sub" id="chiSquareSub">χ²: -- | Entropy: --</div>
     </div>
 
     <div class="metric-box">
@@ -107,7 +119,7 @@
     </div>
 
     <div class="metric-box">
-      <div class="metric-label">Balance &amp; Net Session PnL</div>
+      <div class="metric-label">Account Balance &amp; Session PnL</div>
       <div class="metric-value">
         <span id="balanceDisplay">$1,000.00</span>
       </div>
@@ -125,7 +137,7 @@
       <div class="card">
         <div class="card-header">
           <div class="card-title">
-            <span>Live Tick Stream (Last 25 Digits)</span>
+            <span>Live Real-Time Tick Stream (Last 25 Digits)</span>
           </div>
           <span class="card-badge" id="evenOddRatioBadge">Even: 50% | Odd: 50%</span>
         </div>
@@ -140,7 +152,7 @@
           <div class="card-title">
             <span>Digit Frequency Distribution &amp; Recurrence Drought (0–9)</span>
           </div>
-          <span class="card-badge">Dashed Line = 10.0% Expected Uniform</span>
+          <span class="card-badge">Dashed Line = 10.0% Expected Baseline</span>
         </div>
         <div class="card-body">
           <div class="digit-grid" id="digitDistributionGrid">
@@ -155,7 +167,7 @@
           <div class="card-title">
             <span>1st-Order Markov Chain Transition Matrix — P(Next = Col | Current = Row)</span>
           </div>
-          <span class="card-badge" id="activeMarkovRowBadge">Current Row: -</span>
+          <span class="card-badge" id="activeMarkovRowBadge">Active Row: -</span>
         </div>
         <div class="card-body markov-container">
           <table class="markov-table" id="markovTable">
@@ -173,7 +185,7 @@
       <div class="card">
         <div class="card-header">
           <div class="card-title">
-            <span>Strategy &amp; Risk Management Engine (Anti-Bust Guardrails)</span>
+            <span>Execution &amp; Risk Management Engine</span>
           </div>
           <span class="card-badge" id="botStateBadge">IDLE</span>
         </div>
@@ -189,7 +201,7 @@
               <div>
                 <div style="font-weight: 700; font-size: 14px;" id="bannerSignalTitle">Waiting for Tick History...</div>
                 <div style="font-size: 11px; color: var(--text-secondary);" id="bannerSignalSub">
-                  P(Match): --% | Theoretical Differ Edge: --%
+                  Conditional Loss Prob: --% | Win Expectancy: --%
                 </div>
               </div>
             </div>
@@ -201,7 +213,7 @@
 
           <div class="settings-grid">
             <div class="form-group">
-              <label for="contractTypeSelect">High Win-Rate Contract Type</label>
+              <label for="contractTypeSelect">Contract Selection (~90% Win Rate)</label>
               <select id="contractTypeSelect">
                 <option value="DIGITDIFF" selected>DIGIT DIFFERS (~90% Win Rate, ~9.6% Payout)</option>
                 <option value="DIGITOVER_0">DIGIT OVER 0 (~90% Win Rate, ~9.6% Payout)</option>
@@ -212,13 +224,12 @@
             </div>
 
             <div class="form-group">
-              <label for="strategyModeSelect">Target Selection Algorithm</label>
+              <label for="strategyModeSelect">Target Prediction Model</label>
               <select id="strategyModeSelect">
-                <option value="HYBRID" selected>Hybrid Ensemble (Markov Min + Coldest + Anti-Streak)</option>
-                <option value="MARKOV_ZERO">Strict Markov Zero-Transition Filter (P ≤ 4%)</option>
+                <option value="HYBRID" selected>Hybrid Ensemble (Markov Min + Coldest + Drought)</option>
                 <option value="MARKOV_MIN">Lowest Markov Transition P(Next | Current)</option>
                 <option value="COLDEST">Coldest Digit (Lowest Rolling Frequency)</option>
-                <option value="POST_CLUSTER">Cluster Exhaustion (After 2x Repeat)</option>
+                <option value="POST_CLUSTER">Cluster Exhaustion (After 2x Consecutive)</option>
               </select>
             </div>
 
@@ -228,7 +239,7 @@
             </div>
 
             <div class="form-group">
-              <label for="sizingModeSelect">Position Sizing / Recovery Mode</label>
+              <label for="sizingModeSelect">Anti-Bust Position Sizing</label>
               <select id="sizingModeSelect">
                 <option value="DALEMBERT" selected>Capped D'Alembert (+1 Unit on Loss, -1 on Win)</option>
                 <option value="FLAT">Flat Stake (Zero Progression - Safest)</option>
@@ -237,7 +248,7 @@
             </div>
 
             <div class="form-group">
-              <label for="minConfidenceInput">Min Confidence Threshold (%)</label>
+              <label for="minConfidenceInput">Min Confidence Filter (%)</label>
               <input type="number" id="minConfidenceInput" value="76" min="50" max="98" step="1" />
             </div>
 
@@ -280,7 +291,7 @@
       <div class="card">
         <div class="card-header">
           <div class="card-title">
-            <span>Real-Time Equity Curve &amp; Trade Execution Ledger</span>
+            <span>Real-Time Equity Curve &amp; Trade Ledger</span>
           </div>
           <span class="card-badge" id="streakBadge">Streak: 0</span>
         </div>
@@ -306,7 +317,7 @@
               <tbody id="tradeTableBody">
                 <tr>
                   <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">
-                    No trades executed yet. Start Auto Bot or click "Snipe 1 Trade Now" to test against live Deriv ticks.
+                    No trades executed yet. Click "Snipe 1 Trade Now" or start Auto Bot.
                   </td>
                 </tr>
               </tbody>
@@ -318,6 +329,42 @@
     </div>
 
   </main>
+
+  <!-- API Token Modal -->
+  <div class="modal-overlay" id="tokenModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">Deriv Account Authentication</div>
+        <button class="modal-close" id="closeTokenModalBtn">×</button>
+      </div>
+      <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 14px;">
+        To trade with real funds or demo balance on Deriv, paste your API token below.
+        Tokens can be created in your Deriv settings with <strong>Read</strong> and <strong>Trade</strong> scopes.
+      </p>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label for="modalTokenInput">Deriv API Token</label>
+        <input type="password" id="modalTokenInput" placeholder="Paste your Deriv API token here..." />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label for="modalAppIdInput">Deriv App ID (Optional, defaults to 1089)</label>
+        <input type="number" id="modalAppIdInput" value="1089" />
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <a href="https://app.deriv.com/account/api-token" target="_blank" rel="noopener" class="btn btn-secondary" style="text-decoration: none; font-size: 11px;">
+          Get Token from Deriv ↗
+        </a>
+        <button class="btn btn-start" id="saveTokenBtn" style="min-width: 140px;">
+          Connect Account
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer"></div>
 
   <script src="app.js"></script>
 </body>
